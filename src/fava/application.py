@@ -36,6 +36,7 @@ from flask import render_template
 from flask import render_template_string
 from flask import request
 from flask import send_file
+from flask import jsonify
 from flask import url_for as flask_url_for
 from flask_babel import Babel  # type: ignore[import]
 from flask_babel import get_translations
@@ -310,6 +311,16 @@ def _setup_routes(fava_app: Flask) -> None:  # noqa: PLR0915
         if report_name in SERVER_SIDE_REPORTS:
             return render_template(f"{report_name}.html")
         return abort(404)
+
+    @fava_app.route("/<bfile>/extension/<ext_name>/<endpoint>")
+    def extension_endpoint(ext_name: str, endpoint: str):
+        response = g.ledger.extensions.custom_endpoint(ext_name, endpoint, request.args)
+        if type(response) == str:
+            return response
+        elif type(response) == dict:
+            return jsonify(response)
+        elif response == None:
+            return abort(404)
 
     @fava_app.route("/<bfile>/extension_js_module/<extension_name>.js")
     def extension_js_module(extension_name: str) -> Response:
