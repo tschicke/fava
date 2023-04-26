@@ -185,11 +185,19 @@ def _chart_account_balance(account_name: str) -> ChartData:
         g.ledger.charts.linechart(g.filtered, account_name, g.conversion),
     )
 
+def _chart_account_balance_interval(account_name: str) -> ChartData:
+    return ChartData(
+        "balances",
+        gettext("Account Balance (Interval)"),
+        g.ledger.charts.linechart_interval(g.filtered, g.interval, account_name, g.conversion),
+    )
+
 
 class ChartApi:
     """Functions to generate chart data."""
 
     account_balance = _chart_account_balance
+    account_balance_interval = _chart_account_balance_interval
     hierarchy = _chart_hierarchy
     interval_totals = _chart_interval_totals
     net_worth = _chart_net_worth

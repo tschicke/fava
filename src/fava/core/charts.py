@@ -8,6 +8,7 @@ from dataclasses import fields
 from dataclasses import is_dataclass
 from datetime import date
 from datetime import timedelta
+from decimal import Decimal
 from typing import Any
 from typing import Iterable
 from typing import Pattern
@@ -37,8 +38,6 @@ with suppress(ImportError):
     from flask.json.provider import JSONProvider
 
 if TYPE_CHECKING:  # pragma: no cover
-    from decimal import Decimal
-
     from flask import Flask
 
     from fava.beans.funcs import ResultRow
@@ -272,6 +271,58 @@ class ChartModule(FavaModule):
             last_currencies = currencies
 
             yield DateAndBalance(entry.date, balance)
+
+    @listify
+    def linechart_interval(
+        self, filtered: FilteredLedger, interval: Interval, account_name: str, conversion: str
+    ) -> Generator[DateAndBalance, None, None]:
+        """Get the balance of an account as a line chart.
+
+        Args:
+            account_name: A string.
+            conversion: The conversion to use.
+
+        Returns:
+            A list of dicts for all dates on which the balance of the given
+            account has changed containing the balance (in units) of the
+            account at that date.
+        """
+        real_account = realization.get_or_create(
+            filtered.root_account, account_name
+        )
+        postings = realization.get_postings(real_account)
+        journal = realization.iterate_with_balance(postings)
+
+        # When the balance for a commodity just went to zero, it will be
+        # missing from the 'balance' so keep track of currencies that last had
+        # a balance.
+        last_currencies = None
+
+        prices = self.ledger.prices
+        itr = iter(journal)
+        val = next(itr, None)
+        if not val:
+            return
+        entry, _, change, balance_inventory = val
+        for date_range in filtered.interval_ranges(interval):
+            while itr and entry.date < date_range.end:
+                itr = next(journal, None)
+                if itr:
+                    entry, _, change, balance_inventory = itr
+
+            balance = inv_to_dict(
+                cost_or_value(
+                    balance_inventory, conversion, prices, date_range.end_inclusive
+                )
+            )
+
+            currencies = set(balance.keys())
+            if last_currencies:
+                for currency in last_currencies - currencies:
+                    balance[currency] = Decimal()
+            last_currencies = currencies
+
+            yield DateAndBalance(date_range.end_inclusive, balance)
 
     @listify
     def net_worth(

@@ -10,6 +10,7 @@
 {% block content %}
 {% set chart_list = [
   chart_api.account_balance(account_name),
+  chart_api.account_balance_interval(account_name),
   chart_api.interval_totals(g.interval, account_name, label=_('Changes')),
 ] %}
 {% if not journal %}
