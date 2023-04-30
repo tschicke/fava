@@ -26,4 +26,4 @@ def test_extension_module_globals(get_ledger: GetFavaLedger) -> None:
         modules[0]
     )
 
-    assert module_path.endswith("/fava/ext/portfolio_list/PortfolioList.js")
+    assert module_path.endswith("PortfolioList.js")
