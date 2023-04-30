@@ -309,7 +309,7 @@ def _setup_routes(fava_app: Flask) -> None:  # noqa: PLR0915
         return abort(404)
 
     @fava_app.route("/<bfile>/extension_module/<extension_name>/")
-    def extension_module(extension_name: str) -> str:
+    def extension_module(extension_name: str) -> Response:
         """Endpoint for extension module source."""
         try:
             extension_path = g.ledger.extensions.get_extension_module(

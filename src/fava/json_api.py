@@ -180,7 +180,7 @@ api_endpoint(get_ledger_data)
 
 
 @api_endpoint
-def get_extension_modules() -> str:
+def get_extension_modules() -> list[str]:
     """Endpoint for extension module list."""
     return g.ledger.extensions.extension_modules()
 

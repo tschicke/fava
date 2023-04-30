@@ -104,7 +104,7 @@ class Extension {
   }
 }
 
-let extensions: Extension[] = [];
+const extensions: Extension[] = [];
 
 /**
  * On page load, check if the new page is an extension report page,
@@ -175,9 +175,14 @@ function initExtensions(): void {
         `Error importing module for extension ${name}: module must export "default" object`
       );
     });
-    extensions = await Promise.all(module_promises);
-    for (const ext of extensions) {
-      ext.initExtension();
+    const extensionResults = await Promise.allSettled(module_promises);
+    for (const res of extensionResults) {
+      if (res.status === "fulfilled") {
+        res.value.initExtension();
+        extensions.push(res.value);
+      } else {
+        log_error(res.reason);
+      }
     }
 
     router.trigger("page-loaded");
