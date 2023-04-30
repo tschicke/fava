@@ -59,6 +59,27 @@ class ExtensionModule(FavaModule):
             if getattr(base, hook) != getattr(FavaExtensionBase, hook)
         ]
 
+    def extension_modules(self) -> list[str]:
+        """Find all extensions that have a javascript module that should be loaded."""
+        return [
+            ext.name
+            for ext_class, ext in self._instances.items()
+            if (
+                Path(getfile(ext_class)).parent
+                / f"{ext_class.__qualname__}.js"
+            ).exists()
+        ]
+
+    def get_extension_module(self, name: str) -> str:
+        """Get the path of the javascript module file for a given extension."""
+        for ext_class in self._instances:
+            if ext_class.__qualname__ == name:
+                extension_dir = Path(getfile(ext_class)).parent
+                js_module = extension_dir / f"{ext_class.__qualname__}.js"
+                return str(js_module)
+
+        raise LookupError("Extension report not found.")
+
     def template_and_extension(
         self, name: str
     ) -> tuple[str, FavaExtensionBase]:
