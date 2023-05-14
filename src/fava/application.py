@@ -308,7 +308,7 @@ def _setup_routes(fava_app: Flask) -> None:  # noqa: PLR0915
             return render_template("_layout.html", active_page=report_name)
         return abort(404)
 
-    @app.route("/<bfile>/extension_js_module/<extension_name>.js")
+    @fava_app.route("/<bfile>/extension_js_module/<extension_name>.js")
     def extension_js_module(extension_name: str) -> Response:
         """Endpoint for extension module source."""
         try:

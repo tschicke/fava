@@ -19,6 +19,8 @@ class PortfolioList(FavaExtensionBase):  # pragma: no cover
 
     report_title = "Portfolio List"
 
+    has_js_module = True
+
     def portfolio_accounts(self):
         """Get an account tree based on matching regex patterns."""
         tree = g.filtered.root_tree
