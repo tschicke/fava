@@ -178,10 +178,9 @@ function initExtensions(extension_modules: string[]): void {
           log_error(res.reason);
         }
       }
+      router.trigger("page-loaded");
     })
     .catch(log_error);
-
-  router.trigger("page-loaded");
 }
 
 function init(): void {
