@@ -86,20 +86,14 @@ class Extension {
   }
 
   initExtension(): void {
-    this.tryCall("onExtensionInit", []);
+    if (this.extension_module.onExtensionInit) {
+      this.extension_module.onExtensionInit();
+    }
   }
 
   onPageLoad(): void {
-    this.tryCall("onExtensionPageLoad", []);
-  }
-
-  private tryCall<
-    K extends keyof ExtensionModule,
-    Fn extends NonNullable<ExtensionModule[K]>
-  >(function_name: K, args: Parameters<Fn>): void {
-    const fn = this.extension_module[function_name];
-    if (fn) {
-      fn.call(this.extension_module, ...args);
+    if (this.extension_module.onExtensionPageLoad) {
+      this.extension_module.onExtensionPageLoad();
     }
   }
 }
@@ -162,31 +156,32 @@ interface ModuleImport {
  * to load dynamically. Load and initialize each of these modules and trigger
  * the "page-loaded" event once everything is loaded.
  */
-function initExtensions(): void {
-  get("extension_modules").then(async (module_list: string[]) => {
-    const module_promises = module_list.map(async (name) => {
-      const extension_module: ModuleImport = await (import(
-        urlFor(`extension_module/${name}`, undefined, false)
-      ) as Promise<ModuleImport>);
-      if (typeof extension_module.default === "object") {
-        return new Extension(name, extension_module.default);
-      }
-      throw new Error(
-        `Error importing module for extension ${name}: module must export "default" object`
-      );
-    });
-    const extensionResults = await Promise.allSettled(module_promises);
-    for (const res of extensionResults) {
-      if (res.status === "fulfilled") {
-        res.value.initExtension();
-        extensions.push(res.value);
-      } else {
-        log_error(res.reason);
-      }
+function initExtensions(extension_modules: string[]): void {
+  const module_promises = extension_modules.map(async (name) => {
+    const extension_module: ModuleImport = await (import(
+      urlFor(`extension_js_module/${name}.js`, undefined, false)
+    ) as Promise<ModuleImport>);
+    if (typeof extension_module.default === "object") {
+      return new Extension(name, extension_module.default);
     }
+    throw new Error(
+      `Error importing module for extension ${name}: module must export "default" object`
+    );
+  });
+  Promise.allSettled(module_promises)
+    .then((extensionResults) => {
+      for (const res of extensionResults) {
+        if (res.status === "fulfilled") {
+          res.value.initExtension();
+          extensions.push(res.value);
+        } else {
+          log_error(res.reason);
+        }
+      }
+    })
+    .catch(log_error);
 
-    router.trigger("page-loaded");
-  }, log_error);
+  router.trigger("page-loaded");
 }
 
 function init(): void {
@@ -223,9 +218,8 @@ function init(): void {
 
   ledgerData.subscribe((val) => {
     errors.set(val.errors);
+    initExtensions(val.extension_js_modules);
   });
-
-  initExtensions();
 }
 
 init();

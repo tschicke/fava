@@ -22,6 +22,7 @@ class ExtensionModule(FavaModule):
         super().__init__(ledger)
         self._instances: dict[type[FavaExtensionBase], FavaExtensionBase] = {}
         self.reports: list[tuple[str, str]] = []
+        self.js_modules: list[str] = []
 
     def load_file(self) -> None:
         all_extensions = []
@@ -51,6 +52,10 @@ class ExtensionModule(FavaModule):
             if ext.report_title is not None
         ]
 
+        self.js_modules = [
+            ext.name for ext in self._instances.values() if ext.has_js_module
+        ]
+
     def exts_for_hook(self, hook: str) -> list[FavaExtensionBase]:
         """Find all extensions that have implemented the given hook."""
         return [
@@ -59,18 +64,7 @@ class ExtensionModule(FavaModule):
             if getattr(base, hook) != getattr(FavaExtensionBase, hook)
         ]
 
-    def extension_modules(self) -> list[str]:
-        """Find all extensions that have a javascript module that should be loaded."""
-        return [
-            ext.name
-            for ext_class, ext in self._instances.items()
-            if (
-                Path(getfile(ext_class)).parent
-                / f"{ext_class.__qualname__}.js"
-            ).exists()
-        ]
-
-    def get_extension_module(self, name: str) -> str:
+    def get_extension_js_module(self, name: str) -> str:
         """Get the path of the javascript module file for a given extension."""
         for ext_class in self._instances:
             if ext_class.__qualname__ == name:

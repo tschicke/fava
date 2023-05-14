@@ -180,12 +180,6 @@ api_endpoint(get_ledger_data)
 
 
 @api_endpoint
-def get_extension_modules() -> list[str]:
-    """Endpoint for extension module list."""
-    return g.ledger.extensions.extension_modules()
-
-
-@api_endpoint
 def get_payee_accounts(payee: str) -> list[str]:
     """Rank accounts for the given payee."""
     return g.ledger.attributes.payee_accounts(payee)
