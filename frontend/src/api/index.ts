@@ -55,7 +55,6 @@ interface GetAPIParams {
   context: { entry_hash: string };
   errors: undefined;
   extract: { filename: string; importer: string };
-  extension_modules: undefined;
   events: Filters;
   documents: Filters;
   ledger_data: undefined;
