@@ -318,7 +318,7 @@ def _setup_routes(fava_app: Flask) -> None:  # noqa: PLR0915
         args = (
             request.args
             if request.method == "GET"
-            else request.get_json(silent=True)
+            else request.get_json(silent=True) or request.files
         )
         response = g.ledger.extensions.custom_endpoint(
             ext_name, endpoint, args
