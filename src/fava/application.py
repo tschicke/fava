@@ -30,12 +30,12 @@ from beancount.utils.text_utils import replace_numbers
 from flask import abort
 from flask import current_app
 from flask import Flask
+from flask import jsonify
 from flask import redirect
 from flask import render_template
 from flask import render_template_string
 from flask import request
 from flask import send_file
-from flask import jsonify
 from flask import url_for as flask_url_for
 from flask_babel import Babel  # type: ignore[import]
 from flask_babel import get_translations
@@ -309,9 +309,10 @@ def _setup_routes(fava_app: Flask) -> None:  # noqa: PLR0915
             return render_template("_layout.html", active_page=report_name)
         return abort(404)
 
-    @app.route(
-        "/<bfile>/extension/<ext_name>/<endpoint>", methods=["GET", "POST", "PUT"]
-       )
+    @fava_app.route(
+        "/<bfile>/extension/<ext_name>/<endpoint>",
+        methods=["GET", "POST", "PUT"],
+    )
     def extension_endpoint(ext_name: str, endpoint: str) -> Response:
         """Endpoint for custom extension endpoints."""
         args = (
@@ -319,7 +320,9 @@ def _setup_routes(fava_app: Flask) -> None:  # noqa: PLR0915
             if request.method == "GET"
             else request.get_json(silent=True)
         )
-        response = g.ledger.extensions.custom_endpoint(ext_name, endpoint, args)
+        response = g.ledger.extensions.custom_endpoint(
+            ext_name, endpoint, args
+        )
         if isinstance(response, str):
             return jsonify(response)
         if isinstance(response, dict):
@@ -328,6 +331,7 @@ def _setup_routes(fava_app: Flask) -> None:  # noqa: PLR0915
             return jsonify(response)
         if response is not None:
             return abort(404)
+        return abort(404)
 
     @fava_app.route("/<bfile>/extension_js_module/<extension_name>.js")
     def extension_js_module(extension_name: str) -> Response:

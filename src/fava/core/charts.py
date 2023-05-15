@@ -274,12 +274,18 @@ class ChartModule(FavaModule):
 
     @listify
     def linechart_interval(
-        self, filtered: FilteredLedger, interval: Interval, account_name: str, conversion: str
-    ) -> Generator[DateAndBalance, None, None]:
+        self,
+        filtered: FilteredLedger,
+        interval: Interval,
+        account_name: str,
+        conversion: str,
+    ) -> Iterable[DateAndBalance]:
         """Get the balance of an account as a line chart.
 
         Args:
             account_name: A string.
+            filtered: a f
+            interval: a f
             conversion: The conversion to use.
 
         Returns:
@@ -312,7 +318,10 @@ class ChartModule(FavaModule):
 
             balance = inv_to_dict(
                 cost_or_value(
-                    balance_inventory, conversion, prices, date_range.end_inclusive
+                    balance_inventory,
+                    conversion,
+                    prices,
+                    date_range.end_inclusive,
                 )
             )
 

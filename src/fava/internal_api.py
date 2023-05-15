@@ -185,11 +185,14 @@ def _chart_account_balance(account_name: str) -> ChartData:
         g.ledger.charts.linechart(g.filtered, account_name, g.conversion),
     )
 
+
 def _chart_account_balance_interval(account_name: str) -> ChartData:
     return ChartData(
         "balances",
         gettext("Account Balance (Interval)"),
-        g.ledger.charts.linechart_interval(g.filtered, g.interval, account_name, g.conversion),
+        g.ledger.charts.linechart_interval(
+            g.filtered, g.interval, account_name, g.conversion
+        ),
     )
 
 

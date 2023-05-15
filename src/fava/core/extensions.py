@@ -3,6 +3,7 @@ from __future__ import annotations
 
 from inspect import getfile
 from pathlib import Path
+from typing import Any
 from typing import TYPE_CHECKING
 
 from fava.core.module_base import FavaModule
@@ -99,12 +100,17 @@ class ExtensionModule(FavaModule):
 
         raise LookupError("Extension report not found.")
 
-    def custom_endpoint(self, ext_name: str, endpoint: str, args):
+    def custom_endpoint(self, ext_name: str, endpoint: str, args: Any) -> Any:
         for cls in self._instances:
             ext = self._instances[cls]
-            if cls.__name__ == ext_name and not ext.endpoints == None:
-                if endpoint in ext.endpoints:
-                    return ext.endpoints[endpoint](args)
+            if (
+                cls.__name__ == ext_name
+                and ext.endpoints is not None
+                and endpoint in ext.endpoints
+            ):
+                return ext.endpoints[endpoint](args)
+
+        return None
 
     def after_entry_modified(self, entry: Directive, new_lines: str) -> None:
         for ext in self.exts_for_hook("after_entry_modified"):
