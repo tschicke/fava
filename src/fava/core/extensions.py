@@ -72,13 +72,6 @@ class ExtensionModule(FavaModule):
         """Get the extension with the given name."""
         return self._instances.get(name, None)
 
-    def custom_endpoint(self, ext_name: str, endpoint: str, args):
-        for cls in self._instances:
-            ext = self._instances[cls]
-            if cls.__name__ == ext_name and not ext.endpoints == None:
-                if endpoint in ext.endpoints:
-                    return ext.endpoints[endpoint](args)
-
     def after_entry_modified(self, entry: Directive, new_lines: str) -> None:
         for ext in self._exts:
             ext.after_entry_modified(entry, new_lines)

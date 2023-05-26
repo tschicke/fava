@@ -9,6 +9,54 @@ import { getUrlPath, urlFor } from "./helpers";
 import { log_error } from "./log";
 import { extensions } from "./stores";
 
+class ExtensionApi {
+  extension_name: string;
+
+  constructor(extension_name: string) {
+    this.extension_name = extension_name;
+  }
+
+  request(
+    endpoint: string,
+    method: string,
+    params: Record<string, string | number> | undefined,
+    body: object | undefined
+  ) {
+    const url = urlFor(
+      `extension/${this.extension_name}/${endpoint}`,
+      params,
+      false
+    );
+    let opts = {};
+    if (body) {
+      opts =
+        body instanceof FormData
+          ? { body }
+          : {
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify(body),
+            };
+    }
+    return fetch(url, { method, ...opts }).then((res) => res.json());
+  }
+
+  get(endpoint: string, params: Record<string, string | number>) {
+    return this.request(endpoint, "GET", params, undefined);
+  }
+
+  put(endpoint: string, body: object | undefined) {
+    return this.request(endpoint, "PUT", undefined, body);
+  }
+
+  post(endpoint: string, body: object | undefined) {
+    return this.request(endpoint, "POST", undefined, body);
+  }
+
+  delete(endpoint: string, body: object | undefined) {
+    return this.request(endpoint, "DELETE", undefined, body);
+  }
+}
+
 /**
  * The Javascript code of a Fava extension should export an object of this type.
  */
@@ -19,6 +67,8 @@ export interface ExtensionModule {
   onPageLoad?: () => void;
   /** Run some code after the page for this extension has loaded. */
   onExtensionPageLoad?: () => void;
+
+  api: ExtensionApi;
 }
 
 async function loadExtensionModule(name: string): Promise<ExtensionModule> {
@@ -41,10 +91,34 @@ async function getExt(name: string): Promise<ExtensionModule> {
   if (loaded_ext) {
     return loaded_ext;
   }
-  const ext = loadExtensionModule(name);
-  loaded_extensions.set(name, ext);
-  (await ext).init?.();
+  const extPromise = loadExtensionModule(name);
+  loaded_extensions.set(name, extPromise);
+  const ext = await extPromise;
+  ext.api = new ExtensionApi(name);
+  ext.init?.();
   return ext;
+}
+
+function initExtensionHandlers(m: ExtensionModule) {
+  const article = document.querySelector("article");
+  if (!article) {
+    throw new Error("<article> element is missing from markup");
+  }
+  for (const child of article.getElementsByClassName("extension-handler")) {
+    for (const attr of child.attributes) {
+      if (attr.name.startsWith("data-handler")) {
+        // eslint-disable-next-line @typescript-eslint/no-implied-eval
+        const handler: EventListener = new Function(
+          "event",
+          attr.value
+        ) as EventListener;
+        child.addEventListener(
+          attr.name.replace("data-handler-", ""),
+          (event) => handler.call(m, event)
+        );
+      }
+    }
+  }
 }
 
 /**
@@ -63,7 +137,10 @@ export function handleExtensionPageLoad() {
     for (const { name } of exts) {
       if (path.startsWith(`extension/${name}`)) {
         getExt(name)
-          .then((m) => m.onExtensionPageLoad?.())
+          .then((m) => {
+            initExtensionHandlers(m);
+            m.onExtensionPageLoad?.();
+          })
           .catch(log_error);
       }
     }
