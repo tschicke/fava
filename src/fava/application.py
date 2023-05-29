@@ -316,6 +316,14 @@ def _setup_routes(fava_app: Flask) -> None:  # noqa: PLR0915
             return abort(404)
         return send_file(ext.extension_dir / f"{ext.name}.js")
 
+    @fava_app.route("/<bfile>/extension_css_module/<extension_name>.css")
+    def extension_css_module(extension_name: str) -> Response:
+        """Endpoint for extension css."""
+        ext = g.ledger.extensions.get_extension(extension_name)
+        if ext is None or not ext.has_css_module:
+            return abort(404)
+        return send_file(ext.extension_dir / f"{ext.name}.css")
+
     @fava_app.route("/<bfile>/extension/<extension_name>/")
     def extension_report(extension_name: str) -> str:
         """Endpoint for extension reports."""

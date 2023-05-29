@@ -19,6 +19,9 @@
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <link rel="shortcut icon" href="{{ static_url('favicon.ico') }}">
     <link rel="stylesheet" href="{{ static_url('app.css') }}">
+    {% for extName in ledger.extensions.get_extension_styles() %}
+    <link rel="stylesheet" href="{{ url_for('extension_css_module', extension_name=extName) }}">
+    {% endfor %}
     <title>{{ page_title }} - {{ ledger.options.title }}</title>
     <script type="module" src="{{ static_url('app.js') }}"></script>
   </head>

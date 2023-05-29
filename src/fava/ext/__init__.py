@@ -32,6 +32,7 @@ class FavaExtensionBase:
 
     #: Whether this extension includes a Javascript module.
     has_js_module: bool = False
+    has_css_module: bool = False
 
     config: Any
 

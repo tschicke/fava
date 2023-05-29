@@ -68,6 +68,9 @@ class ExtensionModule(FavaModule):
             for ext in self._exts
         ]
 
+    def get_extension_styles(self) -> list[str]:
+        return [ext.name for ext in self._exts if ext.has_css_module]
+
     def get_extension(self, name: str) -> FavaExtensionBase | None:
         """Get the extension with the given name."""
         return self._instances.get(name, None)
