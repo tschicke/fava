@@ -39,7 +39,7 @@ class FavaExtensionBase:
 
     config: Any
 
-    endpoints: dict[tuple[str, str], Callable[[FavaExtensionBase], Any]] = {}
+    endpoints: dict[tuple[str, str], Callable[[FavaExtensionBase], Any]]
 
     def __init__(self, ledger: FavaLedger, config: str | None = None) -> None:
         """Initialise extension.
@@ -49,6 +49,7 @@ class FavaExtensionBase:
             config: Configuration options string passed from the
                     beancount file's 'fava-extension' line.
         """
+        self.endpoints = {}
         for _, func in inspect.getmembers(self.__class__, inspect.isfunction):
             if hasattr(func, "endpoint_key"):
                 name, methods = func.endpoint_key
