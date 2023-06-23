@@ -30,7 +30,6 @@ from beancount.utils.text_utils import replace_numbers
 from flask import abort
 from flask import current_app
 from flask import Flask
-from flask import jsonify
 from flask import redirect
 from flask import render_template
 from flask import render_template_string
@@ -320,7 +319,11 @@ def _setup_routes(fava_app: Flask) -> None:  # noqa: PLR0915
             return abort(404)
         response = ext.endpoints[key](ext)
 
-        return jsonify(response) if response else abort(404)
+        return (
+            fava_app.make_response(response)
+            if response is not None
+            else abort(404)
+        )
 
     @fava_app.route("/<bfile>/extension_js_module/<extension_name>.js")
     def extension_js_module(extension_name: str) -> Response:
