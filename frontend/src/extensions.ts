@@ -21,6 +21,7 @@ class ExtensionApi {
     method: string,
     params: Record<string, string | number> | undefined,
     body: object | undefined,
+    output: "json" | "string" | "raw" = "json",
   ) {
     const url = urlFor(
       `extension/${this.extension_name}/${endpoint}`,
@@ -37,23 +38,46 @@ class ExtensionApi {
               body: JSON.stringify(body),
             };
     }
-    return fetch(url, { method, ...opts }).then((res) => res.json());
+    const request = fetch(url, { method, ...opts });
+    if (output === "json") {
+      return request.then((res) => res.json());
+    }
+    if (output === "string") {
+      return request.then((res) => res.text());
+    }
+    return request;
   }
 
-  get(endpoint: string, params: Record<string, string | number>) {
-    return this.request(endpoint, "GET", params, undefined);
+  get(
+    endpoint: string,
+    params: Record<string, string | number>,
+    output: "json" | "string" | "raw" = "json",
+  ) {
+    return this.request(endpoint, "GET", params, undefined, output);
   }
 
-  put(endpoint: string, body: object | undefined) {
-    return this.request(endpoint, "PUT", undefined, body);
+  put(
+    endpoint: string,
+    body: object | undefined,
+    output: "json" | "string" | "raw" = "json",
+  ) {
+    return this.request(endpoint, "PUT", undefined, body, output);
   }
 
-  post(endpoint: string, body: object | undefined) {
-    return this.request(endpoint, "POST", undefined, body);
+  post(
+    endpoint: string,
+    body: object | undefined,
+    output: "json" | "string" | "raw" = "json",
+  ) {
+    return this.request(endpoint, "POST", undefined, body, output);
   }
 
-  delete(endpoint: string, body: object | undefined) {
-    return this.request(endpoint, "DELETE", undefined, body);
+  delete(
+    endpoint: string,
+    body: object | undefined,
+    output: "json" | "string" | "raw" = "json",
+  ) {
+    return this.request(endpoint, "DELETE", undefined, body, output);
   }
 }
 
