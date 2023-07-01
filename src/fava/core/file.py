@@ -99,7 +99,11 @@ class FileModule(FavaModule):
             FavaAPIError: If the file at `path` is not one of the
                 source files or it contains invalid unicode.
         """
-        if str(path) not in self.ledger.options["include"]:
+        path_str = str(path)
+        if (
+            path_str not in self.ledger.options["include"]
+            and path_str not in self.ledger.fava_options.external_file
+        ):
             raise NonSourceFileError(path)
 
         with path.open(mode="rb") as file:

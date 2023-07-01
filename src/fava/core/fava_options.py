@@ -11,6 +11,7 @@ import re
 from dataclasses import dataclass
 from dataclasses import field
 from dataclasses import fields
+from pathlib import Path
 from typing import Pattern
 from typing import TYPE_CHECKING
 
@@ -57,6 +58,7 @@ class FavaOptions:
     conversion_currencies: tuple[str, ...] = ()
     default_file: str | None = None
     default_page: str = "income_statement/"
+    external_file: list[str] = field(default_factory=list)
     fiscal_year_end: FiscalYearEnd = END_OF_YEAR
     import_config: str | None = None
     import_dirs: tuple[str, ...] = ()
@@ -129,6 +131,12 @@ def parse_option_custom_entry(  # noqa: PLR0912
         if fye is None:
             raise ValueError("Invalid 'fiscal_year_end' option.")
         options.fiscal_year_end = fye
+    elif key == "external_file":
+        filename = value
+        if not Path(filename).is_absolute():
+            cwd = Path(entry.meta["filename"]).parent
+            filename = str(cwd / filename)
+        options.external_file.append(filename)
     elif key in STR_OPTS:
         setattr(options, key, value)
     elif key in BOOL_OPTS:
