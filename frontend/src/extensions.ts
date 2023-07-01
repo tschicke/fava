@@ -14,11 +14,11 @@ import { extensions } from "./stores";
  */
 export interface ExtensionModule {
   /** Initialise this Javascript module / run some code on the initial load. */
-  init?: () => void;
+  init?: () => void | Promise<void>;
   /** Run some code after any Fava page has loaded. */
-  onPageLoad?: () => void;
+  onPageLoad?: () => void | Promise<void>;
   /** Run some code after the page for this extension has loaded. */
-  onExtensionPageLoad?: () => void;
+  onExtensionPageLoad?: () => void | Promise<void>;
 }
 
 async function loadExtensionModule(name: string): Promise<ExtensionModule> {
@@ -41,10 +41,12 @@ async function getExt(name: string): Promise<ExtensionModule> {
   if (loaded_ext) {
     return loaded_ext;
   }
-  const ext = loadExtensionModule(name);
-  loaded_extensions.set(name, ext);
-  (await ext).init?.();
-  return ext;
+  const extPromise = loadExtensionModule(name).then(async (ext) => {
+    await ext.init?.();
+    return ext;
+  });
+  loaded_extensions.set(name, extPromise);
+  return extPromise;
 }
 
 /**
@@ -52,20 +54,21 @@ async function getExt(name: string): Promise<ExtensionModule> {
  */
 export function handleExtensionPageLoad() {
   const exts = store_get(extensions).filter((e) => e.has_js_module);
+  const path = getUrlPath(window.location);
+  const isExtension = path?.startsWith("extension/");
   for (const { name } of exts) {
     // Run the onPageLoad handler for all pages.
-    getExt(name)
-      .then((m) => m.onPageLoad?.())
-      .catch(log_error);
-  }
-  const path = getUrlPath(window.location);
-  if (path?.startsWith("extension/")) {
-    for (const { name } of exts) {
-      if (path.startsWith(`extension/${name}`)) {
-        getExt(name)
-          .then((m) => m.onExtensionPageLoad?.())
-          .catch(log_error);
-      }
+    let pageLoadPromise = getExt(name).then(async (m) => {
+      await m.onPageLoad?.();
+      return m;
+    });
+    if (isExtension && path?.startsWith(`extension/${name}`)) {
+      pageLoadPromise = pageLoadPromise.then(async (m) => {
+        await m.onExtensionPageLoad?.();
+        return m;
+      });
     }
+
+    pageLoadPromise.catch(log_error);
   }
 }
