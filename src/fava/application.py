@@ -24,6 +24,7 @@ from urllib.parse import urlencode
 from urllib.parse import urlparse
 from urllib.parse import urlunparse
 
+import jinja2
 import markdown2  # type: ignore[import]
 from beancount import __version__ as beancount_version
 from beancount.utils.text_utils import replace_numbers
@@ -322,9 +323,7 @@ def _setup_routes(fava_app: Flask) -> None:  # noqa: PLR0915
         ext = g.ledger.extensions.get_extension(extension_name)
         if ext is None or ext.report_title is None:
             abort(404)
-        template_path = ext.extension_dir / "templates" / f"{ext.name}.html"
-        template = template_path.read_text(encoding="utf-8")
-        content = Markup(render_template_string(template, extension=ext))
+        content = Markup(render_template(f"{ext.name}.html", extension=ext))
         return render_template(
             "_layout.html",
             content=content,
@@ -440,6 +439,30 @@ def create_app(
     _setup_babel(fava_app)
     _setup_filters(fava_app, read_only=read_only, incognito=incognito)
     _setup_routes(fava_app)
+
+    def load_template(name: str) -> str | None:
+        if not request.view_args or "extension_name" not in request.view_args:
+            return None
+        extension_name = request.view_args["extension_name"]
+        ext = g.ledger.extensions.get_extension(extension_name)
+        if not ext:
+            return None
+        template_path = ext.extension_dir / "templates" / name
+        if template_path.exists():
+            return template_path.read_text(encoding="utf-8")
+        return None
+
+    loader = fava_app.jinja_loader
+    # Since most requests won't be extension requests,
+    # put the current loader first so most requests
+    # don't need to go through load_template
+    if loader:
+        fava_app.jinja_loader = jinja2.ChoiceLoader(
+            [
+                loader,
+                jinja2.FunctionLoader(load_template),
+            ]
+        )
 
     fava_app.config["HAVE_EXCEL"] = HAVE_EXCEL
     fava_app.config["BEANCOUNT_FILES"] = [str(f) for f in files]
