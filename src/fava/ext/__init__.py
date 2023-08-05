@@ -12,6 +12,10 @@ from typing import TYPE_CHECKING
 from fava.helpers import BeancountError
 
 if TYPE_CHECKING:  # pragma: no cover
+    from typing import Callable
+
+    from flask.wrappers import Response
+
     from fava.beans.abc import Directive
     from fava.core import FavaLedger
 
@@ -35,6 +39,8 @@ class FavaExtensionBase:
 
     config: Any
 
+    endpoints: dict[tuple[str, str], Callable[[FavaExtensionBase], Any]]
+
     def __init__(self, ledger: FavaLedger, config: str | None = None) -> None:
         """Initialise extension.
 
@@ -43,6 +49,16 @@ class FavaExtensionBase:
             config: Configuration options string passed from the
                     beancount file's 'fava-extension' line.
         """
+        self.endpoints = {}
+
+        # Go through each of the subclass's functions to find the ones
+        # marked as endpoints by @extension_endpoint
+        for _, func in inspect.getmembers(self.__class__, inspect.isfunction):
+            if hasattr(func, "endpoint_key"):
+                name, methods = func.endpoint_key
+                for method in methods:
+                    self.endpoints[(name, method)] = func
+
         self.ledger = ledger
         try:
             self.config = ast.literal_eval(config) if config else None
@@ -58,6 +74,15 @@ class FavaExtensionBase:
     def extension_dir(self) -> Path:
         """Directory to look for templates directory and Javascript code."""
         return Path(inspect.getfile(self.__class__)).parent
+
+    def set_endpoint(
+        self,
+        endpoint_name: str,
+        func: Callable[[FavaExtensionBase], Any],
+        methods: list[str] | None = None,
+    ) -> None:
+        for method in methods or ["GET"]:
+            self.endpoints[(endpoint_name, method)] = func
 
     def after_entry_modified(self, entry: Directive, new_lines: str) -> None:
         """Run after an `entry` has been modified."""
@@ -126,3 +151,49 @@ def find_extensions(
         )
 
     return classes, []
+
+
+def extension_endpoint(
+    func_or_endpoint_name: Callable[[FavaExtensionBase], Any]
+    | str
+    | None = None,
+    methods: list[str] | None = None,
+) -> (
+    Callable[[FavaExtensionBase], Response]
+    | Callable[
+        [Callable[[FavaExtensionBase], Response]],
+        Callable[[FavaExtensionBase], Response],
+    ]
+):
+    """Decorator to mark a function as an endpoint.
+
+    Can be used as @extension_endpoint or @extension_endpoint(endpoint_name, methods)
+
+    When used as @extension_endpoint, the endpoint name is the name of the function,
+    and methods is "GET"
+
+    When used as @extension_endpoint(endpoint_name, methods), the given endpoint name
+    and methods are used, but both are optional. If endpoint_name is None, default to
+    the function name, and if methods is None, default to "GET"
+    """
+    endpoint_name = (
+        func_or_endpoint_name
+        if isinstance(func_or_endpoint_name, str)
+        else None
+    )
+
+    def decorator(
+        func: Callable[[FavaExtensionBase], Response],
+    ) -> Callable[[FavaExtensionBase], Response]:
+        f: Any = func
+        f.endpoint_key = (
+            endpoint_name if endpoint_name else func.__name__,
+            methods or ["GET"],
+        )
+        return func
+
+    return (
+        decorator(func_or_endpoint_name)
+        if callable(func_or_endpoint_name)
+        else decorator
+    )
