@@ -6,6 +6,7 @@
 import { get as store_get } from "svelte/store";
 
 import { getUrlPath, urlFor } from "./helpers";
+import { fetch } from "./lib/fetch";
 import { log_error } from "./log";
 import { extensions } from "./stores";
 
