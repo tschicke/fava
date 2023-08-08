@@ -84,6 +84,7 @@ class ExtensionApi {
 
 export interface ExtensionContext {
   api: ExtensionApi;
+  getExt: (name: string) => Promise<ExtensionData>;
 }
 
 /**
@@ -121,12 +122,16 @@ export class ExtensionData implements Required<ExtensionModule> {
   }
 }
 
-async function loadExtensionModule(name: string): Promise<ExtensionData> {
+async function loadExtensionModule(
+  name: string,
+  getExtension: (name: string) => Promise<ExtensionData>,
+): Promise<ExtensionData> {
   const url = urlFor(`extension_js_module/${name}.js`, undefined, false);
   const mod = await (import(url) as Promise<{ default?: ExtensionModule }>);
   if (typeof mod.default === "object") {
     const context: ExtensionContext = {
       api: new ExtensionApi(name),
+      getExt: getExtension,
     };
     return new ExtensionData(context, mod.default);
   }
@@ -144,7 +149,7 @@ async function getExt(name: string): Promise<ExtensionData> {
   if (loaded_ext) {
     return loaded_ext;
   }
-  const ext = loadExtensionModule(name);
+  const ext = loadExtensionModule(name, getExt);
   loaded_extensions.set(name, ext);
   (await ext).init();
   return ext;
