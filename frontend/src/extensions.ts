@@ -118,7 +118,7 @@ export class ExtensionData implements Required<ExtensionModule> {
   }
 
   onExtensionPageLoad(): void {
-    this.extension.onPageLoad?.(this.context);
+    this.extension.onExtensionPageLoad?.(this.context);
   }
 }
 
