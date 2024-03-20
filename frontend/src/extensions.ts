@@ -117,7 +117,7 @@ async function loadExtensionModule(
       api: new ExtensionApi(name),
       getExtension,
     };
-    return new ExtensionData(context, mod.default);
+    return new ExtensionData(mod.default, context);
   }
   throw new Error(
     `Error importing module for extension ${name}: module must export "default" object`,
