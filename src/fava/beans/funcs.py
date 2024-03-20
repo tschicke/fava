@@ -1,4 +1,5 @@
 """Various functions to deal with Beancount data."""
+
 from __future__ import annotations
 
 from typing import Any
@@ -21,7 +22,19 @@ if TYPE_CHECKING:  # pragma: no cover
 
 def hash_entry(entry: Directive) -> str:
     """Hash an entry."""
-    return compare.hash_entry(entry)  # type: ignore[no-any-return]
+    if hasattr(entry, "_fields"):
+        return compare.hash_entry(entry)  # type: ignore[no-any-return]
+    return str(hash(entry))
+
+
+def get_position(entry: Directive) -> tuple[str, int]:
+    """Get the filename and position from the entry metadata."""
+    meta = entry.meta
+    filename = meta["filename"]
+    lineno = meta["lineno"]
+    if isinstance(filename, str) and isinstance(lineno, int):
+        return (filename, lineno)
+    raise ValueError("Invalid filename or lineno in entry metadata.")
 
 
 def execute_query(
@@ -41,6 +54,7 @@ def run_query(
     entries: list[Directive],
     options_map: BeancountOptions,
     _query: str,
+    *,
     numberify: bool = False,
 ) -> QueryResult:
     """Run a query."""

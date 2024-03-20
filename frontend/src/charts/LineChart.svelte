@@ -7,7 +7,7 @@
   import type { Writable } from "svelte/store";
 
   import { chartToggledCurrencies, lineChartMode } from "../stores/chart";
-  import { ctx } from "../stores/format";
+  import { ctx, short } from "../stores/format";
 
   import Axis from "./Axis.svelte";
   import { currenciesScale, padExtent } from "./helpers";
@@ -46,7 +46,7 @@
   $: quad = quadtree(
     allValues,
     (d) => x(d.date),
-    (d) => y(d.value)
+    (d) => y(d.value),
   );
 
   $: lineShape = line<LineChartDatum>()
@@ -65,7 +65,7 @@
   $: yAxis = axisLeft(y)
     .tickPadding(6)
     .tickSize(-innerWidth)
-    .tickFormat($ctx.short);
+    .tickFormat($short);
 
   const tooltipFindNode: TooltipFindNode = (xPos, yPos) => {
     const d = quad.find(xPos, yPos);
@@ -75,7 +75,7 @@
   $: futureFilter = xExtent[1] > today ? "url(#desaturateFuture)" : undefined;
 </script>
 
-<svg {width} {height}>
+<svg viewBox={`0 0 ${width} ${height}`}>
   <filter id="desaturateFuture">
     <feColorMatrix type="saturate" values="0.5" x={x(today)} />
     <feBlend in2="SourceGraphic" />

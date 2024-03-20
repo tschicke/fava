@@ -8,7 +8,7 @@
   import type { Action } from "svelte/action";
 
   import { attemptFocus, getFocusableElements } from "../lib/focus";
-  import { closeOverlay } from "../stores";
+  import { closeOverlay } from "../stores/url";
 
   export let shown = false;
   export let focus: string | undefined = undefined;
@@ -70,8 +70,7 @@
 
   .background {
     position: fixed;
-    top: 0;
-    left: 0;
+    inset: 0;
     width: 100%;
     height: 100%;
     cursor: pointer;
@@ -80,8 +79,7 @@
 
   .overlay {
     position: fixed;
-    top: 0;
-    left: 0;
+    inset: 0;
     z-index: var(--z-index-overlay);
     display: flex;
     align-items: start;
@@ -100,7 +98,7 @@
     margin: 0.5em;
     margin-top: 10vh;
     background: var(--background);
-    box-shadow: 0 0 20px var(--overlay-wrapper-background);
+    box-shadow: var(--box-shadow-overlay);
   }
 
   .close {
@@ -133,7 +131,7 @@
     .content {
       height: 100%;
       margin: 0;
-      box-shadow: none;
+      box-shadow: unset;
     }
   }
 </style>

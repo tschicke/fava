@@ -1,39 +1,37 @@
 ci:
-    skip: ["eslint"]
+  skip: ["eslint"]
 repos:
-    - repo: https://github.com/psf/black
-      rev: 23.7.0
-      hooks:
-          - id: black
-    - repo: https://github.com/astral-sh/ruff-pre-commit
-      rev: v0.0.285
-      hooks:
-          - id: ruff
-    - repo: local
-      hooks:
-          - id: prettier
-            name: prettier
-            language: node
-            entry: prettier --write --list-different --ignore-unknown
-            require_serial: true
-            additional_dependencies:
-                - "prettier@3.0.2"
-                - "prettier-plugin-svelte@3.0.3"
-                - "svelte@4.2.0"
-          - id: stylelint
-            name: stylelint
-            language: node
-            entry: stylelint --fix
-            files: \.(css|svelte)$
-            require_serial: true
-            additional_dependencies:
-                - "stylelint@15.10.3"
-                - "stylelint-config-recess-order@4.3.0"
-                - "stylelint-config-standard@34.0.0"
-                - "postcss-html@1.5.0"
-          - id: eslint
-            name: eslint
-            language: node
-            entry: ./frontend/node_modules/eslint/bin/eslint.js --max-warnings 0
-            require_serial: true
-            files: frontend/.*\.(js|ts|svelte)$
+  - repo: https://github.com/astral-sh/ruff-pre-commit
+    rev: v0.3.2
+    hooks:
+      - id: ruff
+        args: ["--fix"]
+      - id: ruff-format
+  - repo: local
+    hooks:
+      - id: prettier
+        name: prettier
+        language: node
+        entry: prettier --write --list-different --ignore-unknown
+        require_serial: true
+        additional_dependencies:
+          - "prettier@3.2.5"
+          - "prettier-plugin-svelte@3.2.2"
+          - "svelte@4.2.12"
+      - id: stylelint
+        name: stylelint
+        language: node
+        entry: stylelint --fix
+        files: \.(css|svelte)$
+        require_serial: true
+        additional_dependencies:
+          - "stylelint@16.2.1"
+          - "stylelint-config-recess-order@5.0.0"
+          - "stylelint-config-standard@36.0.0"
+          - "postcss-html@1.6.0"
+      - id: eslint
+        name: eslint
+        language: node
+        entry: ./frontend/node_modules/eslint/bin/eslint.js --max-warnings 0
+        require_serial: true
+        files: frontend/.*\.(js|ts|svelte)$

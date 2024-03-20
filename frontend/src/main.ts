@@ -17,8 +17,6 @@ import "../css/grid.css";
 import "../css/fonts.css";
 import "../css/help.css";
 import "../css/journal-table.css";
-import "../css/media-mobile.css";
-import "../css/media-print.css";
 import "../css/notifications.css";
 import "../css/tree-table.css";
 
@@ -37,7 +35,7 @@ import { initGlobalKeyboardShortcuts } from "./keyboard-shortcuts";
 import { getScriptTagValue } from "./lib/dom";
 import { log_error } from "./log";
 import { notify, notify_err } from "./notifications";
-import { shouldRenderInFrontend } from "./reports/routes";
+import { frontend_routes } from "./reports/routes";
 import router, { setStoreValuesFromURL, syncStoreValuesToURL } from "./router";
 import { initSidebar } from "./sidebar";
 import { has_changes, updatePageTitle } from "./sidebar/page-title";
@@ -45,7 +43,7 @@ import { SortableTable } from "./sort";
 import { errors, fava_options, ledgerData } from "./stores";
 import { ledger_mtime, read_mtime } from "./stores/mtime";
 import { SvelteCustomElement } from "./svelte-custom-elements";
-import { TreeTable } from "./tree-table";
+import { TreeTableCustomElement } from "./tree-table/tree-table-custom-element";
 
 /**
  * Define the custom elements that Fava uses.
@@ -57,8 +55,10 @@ function defineCustomElements() {
   customElements.define("copyable-text", CopyableText);
   customElements.define("fava-journal", FavaJournal);
   customElements.define("sortable-table", SortableTable, { extends: "table" });
-  customElements.define("tree-table", TreeTable);
   customElements.define("svelte-component", SvelteCustomElement);
+
+  // for extension compatibility
+  customElements.define("tree-table", TreeTableCustomElement);
 }
 
 router.on("page-loaded", () => {
@@ -116,7 +116,7 @@ function init(): void {
       });
   });
 
-  router.init(shouldRenderInFrontend);
+  router.init(frontend_routes);
   setStoreValuesFromURL();
   syncStoreValuesToURL();
   initSidebar();

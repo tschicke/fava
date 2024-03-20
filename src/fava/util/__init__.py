@@ -1,4 +1,5 @@
 """Some small utility functions."""
+
 from __future__ import annotations
 
 import logging
@@ -6,11 +7,7 @@ import re
 import time
 from functools import wraps
 from pathlib import Path
-from typing import Any
-from typing import Callable
-from typing import Iterable
 from typing import TYPE_CHECKING
-from typing import TypeVar
 from unicodedata import normalize
 from urllib.parse import quote
 
@@ -18,14 +15,16 @@ from flask import abort
 from flask import send_file
 
 if TYPE_CHECKING:  # pragma: no cover
+    from collections.abc import Mapping
+    from typing import Any
+    from typing import Callable
+    from typing import Iterable
     from typing import ParamSpec
+    from typing import TypeVar
 
     from _typeshed.wsgi import StartResponse
     from _typeshed.wsgi import WSGIEnvironment
     from flask.wrappers import Response
-
-
-BASEPATH = Path(__file__).parent.parent
 
 
 def filter_api_changed(record: logging.LogRecord) -> bool:
@@ -39,7 +38,7 @@ def setup_logging() -> None:
     logging.getLogger("werkzeug").addFilter(filter_api_changed)
 
 
-if TYPE_CHECKING:
+if TYPE_CHECKING:  # pragma: no cover
     Item = TypeVar("Item")
     P = ParamSpec("P")
     T = TypeVar("T")
@@ -71,7 +70,7 @@ def timefunc(
     return _wrapper
 
 
-def next_key(basekey: str, keys: dict[str, Any]) -> str:
+def next_key(basekey: str, keys: Mapping[str, Any]) -> str:
     """Return the next unused key for basekey in the supplied dictionary.
 
     The first try is `basekey`, followed by `basekey-2`, `basekey-3`, etc

@@ -1,3 +1,4 @@
+import { is_empty } from "./lib/objects";
 import type { Validator } from "./lib/validation";
 import {
   array,
@@ -12,43 +13,63 @@ import {
   union,
 } from "./lib/validation";
 
-export interface Posting {
+const entry_meta_validator = record(
+  defaultValue(
+    union(boolean, number, string),
+    () => "Unsupported metadata value",
+  ),
+);
+
+/** A posting. */
+export class Posting {
   account: string;
   amount: string;
-}
+  meta: EntryMetadata;
 
-const postingValidator = object({
-  account: string,
-  amount: string,
-});
+  constructor() {
+    this.account = "";
+    this.amount = "";
+    this.meta = {};
+  }
+
+  is_empty(): boolean {
+    return !this.account && !this.amount && is_empty(this.meta);
+  }
+
+  private static raw_validator = object({
+    account: string,
+    amount: string,
+    meta: defaultValue(entry_meta_validator, () => ({})),
+  });
+
+  static validator: Validator<Posting> = (json) =>
+    Posting.raw_validator(json).map((value) =>
+      Object.assign(new Posting(), value),
+    );
+}
 
 interface Amount {
   number: string;
   currency: string;
 }
 
-export function emptyPosting(): Posting {
-  return {
-    account: "",
-    amount: "",
-  };
-}
-
 export type EntryMetadata = Record<string, string | boolean | number>;
-export type EntryTypeName = "Balance" | "Note" | "Transaction";
-
-const entry_meta_validator = record(
-  defaultValue(union(boolean, number, string), "Unsupported metadata value"),
-);
+export type EntryTypeName =
+  | "Balance"
+  | "Document"
+  | "Event"
+  | "Note"
+  | "Transaction";
 
 const validatorBase = {
-  type: string,
+  t: string,
   date: string,
   meta: entry_meta_validator,
 };
 
+/** The properties that all entries share. */
 export interface EntryBaseAttributes {
-  type: string;
+  t: string;
   date: string;
   meta: EntryMetadata;
 }
@@ -58,19 +79,20 @@ export const entryBaseValidator = object(
 ) satisfies Validator<EntryBaseAttributes>;
 
 abstract class EntryBase {
-  type: EntryTypeName;
+  t: EntryTypeName;
 
   date: string;
 
   meta: EntryMetadata;
 
   constructor(type: EntryTypeName, date: string) {
-    this.type = type;
+    this.t = type;
     this.meta = {};
     this.date = date;
   }
 }
 
+/** A balance. */
 export class Balance extends EntryBase {
   account: string;
 
@@ -79,15 +101,12 @@ export class Balance extends EntryBase {
   constructor(date: string) {
     super("Balance", date);
     this.account = "";
-    this.amount = {
-      number: "",
-      currency: "",
-    };
+    this.amount = { number: "", currency: "" };
   }
 
-  private static raw_validator = object({
+  private static raw_validator = object<Balance>({
     ...validatorBase,
-    type: constant("Balance"),
+    t: constant("Balance"),
     account: string,
     amount: object({ number: string, currency: string }),
   });
@@ -98,6 +117,57 @@ export class Balance extends EntryBase {
     );
 }
 
+/** A document. */
+export class Document extends EntryBase {
+  readonly account: string;
+
+  readonly filename: string;
+
+  constructor(date: string) {
+    super("Document", date);
+    this.account = "";
+    this.filename = "";
+  }
+
+  private static raw_validator = object<Document>({
+    ...validatorBase,
+    t: constant("Document"),
+    account: string,
+    filename: string,
+  });
+
+  static validator: Validator<Document> = (json) =>
+    Document.raw_validator(json).map((value) =>
+      Object.assign(new Document(value.date), value),
+    );
+}
+
+/** An event. */
+export class Event extends EntryBase {
+  readonly type: string;
+
+  readonly description: string;
+
+  constructor(date: string) {
+    super("Event", date);
+    this.type = "";
+    this.description = "";
+  }
+
+  private static raw_validator = object<Event>({
+    ...validatorBase,
+    t: constant("Event"),
+    type: string,
+    description: string,
+  });
+
+  static validator: Validator<Event> = (json) =>
+    Event.raw_validator(json).map((value) =>
+      Object.assign(new Event(value.date), value),
+    );
+}
+
+/** A note. */
 export class Note extends EntryBase {
   account: string;
 
@@ -109,9 +179,9 @@ export class Note extends EntryBase {
     this.comment = "";
   }
 
-  private static raw_validator = object({
+  private static raw_validator = object<Note>({
     ...validatorBase,
-    type: constant("Note"),
+    t: constant("Note"),
     account: string,
     comment: string,
   });
@@ -122,6 +192,7 @@ export class Note extends EntryBase {
     );
 }
 
+/** A transaction. */
 export class Transaction extends EntryBase {
   flag: string;
 
@@ -142,7 +213,7 @@ export class Transaction extends EntryBase {
     this.narration = "";
     this.tags = [];
     this.links = [];
-    this.postings = [emptyPosting(), emptyPosting()];
+    this.postings = [];
   }
 
   toString(): string {
@@ -153,15 +224,24 @@ export class Transaction extends EntryBase {
     );
   }
 
-  static raw_validator = object({
+  toJSON(): this {
+    return {
+      ...this,
+      postings: this.postings.filter((p) => !p.is_empty()),
+    };
+  }
+
+  private static raw_validator = object<
+    Omit<Transaction, "toString" | "toJSON">
+  >({
     ...validatorBase,
-    type: constant("Transaction"),
+    t: constant("Transaction"),
     flag: string,
     payee: optional_string,
     narration: optional_string,
     tags: array(string),
     links: array(string),
-    postings: array(postingValidator),
+    postings: array(Posting.validator),
   });
 
   static validator: Validator<Transaction> = (json) =>
@@ -171,27 +251,16 @@ export class Transaction extends EntryBase {
 }
 
 /** A Beancount entry, currently only support Balance, Note, and Transaction. */
-export type Entry = Balance | Note | Transaction;
+export type Entry = Balance | Document | Event | Note | Transaction;
 
 /** Validate an Entry. */
 export const entryValidator: Validator<Entry> = union(
   Balance.validator,
+  Document.validator,
+  Event.validator,
   Note.validator,
   Transaction.validator,
 );
-
-const constructors = {
-  Balance,
-  Note,
-  Transaction,
-};
-
-/**
- * Create an empty entry of given type on the given day.
- */
-export function create(type: EntryTypeName, date: string): Entry {
-  return new constructors[type](date);
-}
 
 /**
  * Check whether the given entry is marked as duplicate (used in imports).

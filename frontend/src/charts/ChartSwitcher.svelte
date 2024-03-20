@@ -9,21 +9,24 @@
 
   import type { FavaChart } from ".";
 
-  export let charts: FavaChart[];
+  export let charts: readonly FavaChart[];
 
   $: active_chart =
     charts.find((c) => c.name === $lastActiveChartName) ?? charts?.[0];
 
-  // Get the shortcut key for jumping to the previous or next chart.
-  $: shortcut = (index: number): KeySpec | undefined => {
-    const current = charts.findIndex((e) => e === active_chart);
-    if (index === (current - 1 + charts.length) % charts.length) {
-      return { key: "C", note: _("Previous") };
-    }
-    if (index === (current + 1 + charts.length) % charts.length) {
-      return { key: "c", note: _("Next") };
-    }
-    return undefined;
+  // Get the shortcut key for jumping to the previous chart.
+  $: shortcutPrevious = (index: number): KeySpec | undefined => {
+    const current = active_chart ? charts.indexOf(active_chart) : -1;
+    return index === (current - 1 + charts.length) % charts.length
+      ? { key: "C", note: _("Previous") }
+      : undefined;
+  };
+  // Get the shortcut key for jumping to the next chart.
+  $: shortcutNext = (index: number): KeySpec | undefined => {
+    const current = active_chart ? charts.indexOf(active_chart) : -1;
+    return index === (current + 1 + charts.length) % charts.length
+      ? { key: "c", note: _("Next") }
+      : undefined;
   };
 </script>
 
@@ -35,11 +38,13 @@
     {#each charts as chart, index}
       <button
         type="button"
+        class="unset"
         class:selected={chart === active_chart}
         on:click={() => {
           $lastActiveChartName = chart.name;
         }}
-        use:keyboardShortcut={shortcut(index)}
+        use:keyboardShortcut={shortcutPrevious(index)}
+        use:keyboardShortcut={shortcutNext(index)}
       >
         {chart.name}
       </button>
@@ -56,9 +61,7 @@
   }
 
   button {
-    all: unset;
     padding: 0 0.5em;
-    cursor: pointer;
   }
 
   button + button {
@@ -68,5 +71,20 @@
   button.selected,
   button:hover {
     color: var(--text-color-lighter);
+  }
+
+  @media print {
+    button {
+      display: none;
+      border-left: none;
+    }
+
+    button + button {
+      border-left: none;
+    }
+
+    button.selected {
+      display: inline;
+    }
   }
 </style>

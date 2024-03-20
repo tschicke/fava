@@ -2,23 +2,25 @@
 
 All functions in this module will be automatically added as template filters.
 """
+
 from __future__ import annotations
 
-from typing import overload
+from abc import ABC
+from abc import abstractmethod
 from typing import TYPE_CHECKING
 
-from fava.beans import create
+from fava.core.inventory import _Amount
+from fava.core.inventory import SimpleCounterInventory
 
 if TYPE_CHECKING:  # pragma: no cover
     import datetime
 
     from beancount.core.inventory import Inventory
 
-    from fava.beans.abc import Amount
-    from fava.beans.abc import Position
     from fava.beans.prices import FavaPriceMap
+    from fava.beans.protocols import Amount
+    from fava.beans.protocols import Position
     from fava.core.inventory import CounterInventory
-    from fava.core.inventory import SimpleCounterInventory
 
 
 def get_units(pos: Position) -> Amount:
@@ -30,8 +32,8 @@ def get_cost(pos: Position) -> Amount:
     """Return the total cost of a Position."""
     cost_ = pos.cost
     return (
-        create.amount((cost_.number * pos.units.number, cost_.currency))
-        if cost_ is not None and cost_.number is not None
+        _Amount(cost_.number * pos.units.number, cost_.currency)
+        if cost_ is not None
         else pos.units
     )
 
@@ -58,15 +60,16 @@ def get_market_value(
     units_ = pos.units
     cost_ = pos.cost
 
-    if cost_:
+    if cost_ is not None:
         value_currency = cost_.currency
         base_quote = (units_.currency, value_currency)
         price_number = prices.get_price(base_quote, date)
         if price_number is not None:
-            return create.amount(
-                (units_.number * price_number, value_currency),
+            return _Amount(
+                units_.number * price_number,
+                value_currency,
             )
-        return create.amount((units_.number * cost_.number, value_currency))
+        return _Amount(units_.number * cost_.number, value_currency)
     return units_
 
 
@@ -94,10 +97,10 @@ def convert_position(
     base_quote = (units_.currency, target_currency)
     price_number = prices.get_price(base_quote, date)
     if price_number is not None:
-        return create.amount((units_.number * price_number, target_currency))
+        return _Amount(units_.number * price_number, target_currency)
 
     cost_ = pos.cost
-    if cost_:
+    if cost_ is not None:
         cost_currency = cost_.currency
         if cost_currency != target_currency:
             base_quote1 = (units_.currency, cost_currency)
@@ -106,81 +109,121 @@ def convert_position(
                 base_quote2 = (cost_currency, target_currency)
                 rate2 = prices.get_price(base_quote2, date)
                 if rate2 is not None:
-                    return create.amount(
-                        (units_.number * rate1 * rate2, target_currency),
+                    return _Amount(
+                        units_.number * rate1 * rate2,
+                        target_currency,
                     )
     return units_
 
 
-@overload
-def units(inventory: Inventory) -> Inventory:  # pragma: no cover
-    ...
+def simple_units(
+    inventory: Inventory,
+) -> SimpleCounterInventory:
+    """Get the units of an inventory."""
+    res = SimpleCounterInventory()
+    for pos in inventory:
+        res.add(pos.units.currency, pos.units.number)
+    return res
 
 
-@overload
 def units(
     inventory: CounterInventory,
-) -> SimpleCounterInventory:  # pragma: no cover
-    ...
-
-
-def units(
-    inventory: Inventory | CounterInventory,
-) -> Inventory | SimpleCounterInventory:
+) -> SimpleCounterInventory:
     """Get the units of an inventory."""
     return inventory.reduce(get_units)
 
 
-@overload
-def cost(inventory: Inventory) -> Inventory:  # pragma: no cover
-    ...
+class Conversion(ABC):
+    """A conversion."""
+
+    @abstractmethod
+    def apply(
+        self,
+        inventory: CounterInventory,
+        prices: FavaPriceMap,
+        date: datetime.date | None = None,
+    ) -> SimpleCounterInventory:
+        """Apply the conversion to an inventory."""
 
 
-@overload
-def cost(
+class _AtCostConversion(Conversion):
+    def apply(
+        self,
+        inventory: CounterInventory,
+        prices: FavaPriceMap,  # noqa: ARG002
+        date: datetime.date | None = None,  # noqa: ARG002
+    ) -> SimpleCounterInventory:
+        return inventory.reduce(get_cost)
+
+
+class _AtValueConversion(Conversion):
+    def apply(
+        self,
+        inventory: CounterInventory,
+        prices: FavaPriceMap,
+        date: datetime.date | None = None,
+    ) -> SimpleCounterInventory:
+        return inventory.reduce(get_market_value, prices, date)
+
+
+class _UnitsConversion(Conversion):
+    def apply(
+        self,
+        inventory: CounterInventory,
+        prices: FavaPriceMap,  # noqa: ARG002
+        date: datetime.date | None = None,  # noqa: ARG002
+    ) -> SimpleCounterInventory:
+        return inventory.reduce(get_units)
+
+
+class _CurrencyConversion(Conversion):
+    """Conversion to a list of currencies."""
+
+    def __init__(self, value: str) -> None:
+        self._currencies = tuple(value.split(","))
+
+    def apply(
+        self,
+        inventory: CounterInventory,
+        prices: FavaPriceMap,
+        date: datetime.date | None = None,
+    ) -> SimpleCounterInventory:
+        currencies = iter(self._currencies)
+        currency = next(currencies)
+        res = inventory.reduce(convert_position, currency, prices, date)
+        for currency in currencies:
+            res = res.reduce(convert_position, currency, prices, date)
+        return res
+
+
+#: Convert position to its total cost.
+AT_COST = _AtCostConversion()
+#: Convert position to its market value.
+AT_VALUE = _AtValueConversion()
+#: Convert position to its units.
+UNITS = _UnitsConversion()
+
+
+def conversion_from_str(value: str) -> Conversion:
+    """Parse a conversion string."""
+    if value == "at_cost":
+        return AT_COST
+    if value == "at_value":
+        return AT_VALUE
+    if value == "units":
+        return UNITS
+
+    return _CurrencyConversion(value)
+
+
+def cost_or_value(
     inventory: CounterInventory,
-) -> SimpleCounterInventory:  # pragma: no cover
-    ...
-
-
-def cost(
-    inventory: Inventory | CounterInventory,
-) -> Inventory | SimpleCounterInventory:
-    """Get the cost of an inventory."""
-    return inventory.reduce(get_cost)
-
-
-@overload
-def cost_or_value(
-    inventory: Inventory,
-    conversion: str,
-    prices: FavaPriceMap,
-    date: datetime.date | None,
-) -> Inventory:  # pragma: no cover
-    ...
-
-
-@overload
-def cost_or_value(
-    inventory: CounterInventory,
-    conversion: str,
-    prices: FavaPriceMap,
-    date: datetime.date | None,
-) -> SimpleCounterInventory:  # pragma: no cover
-    ...
-
-
-def cost_or_value(
-    inventory: Inventory | CounterInventory,
-    conversion: str,
+    conversion: str | Conversion,
     prices: FavaPriceMap,
     date: datetime.date | None = None,
-) -> Inventory | SimpleCounterInventory:
+) -> SimpleCounterInventory:
     """Get the cost or value of an inventory."""
-    if not conversion or conversion == "at_cost":
-        return inventory.reduce(get_cost)
-    if conversion == "at_value":
-        return inventory.reduce(get_market_value, prices, date)
-    if conversion == "units":
-        return inventory.reduce(get_units)
-    return inventory.reduce(convert_position, conversion, prices, date)
+    if isinstance(conversion, str):
+        conversion = conversion_from_str(conversion)
+
+    return conversion.apply(inventory, prices, date)

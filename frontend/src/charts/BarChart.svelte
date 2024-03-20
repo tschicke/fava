@@ -6,7 +6,7 @@
 
   import { urlForAccount } from "../helpers";
   import { barChartMode, chartToggledCurrencies } from "../stores/chart";
-  import { ctx } from "../stores/format";
+  import { ctx, short } from "../stores/format";
 
   import Axis from "./Axis.svelte";
   import type { BarChart } from "./bar";
@@ -63,7 +63,7 @@
     chart.currencies.map((c) => [
       c,
       showStackedBars ? null : $currenciesScale(c),
-    ])
+    ]),
   );
 
   // Axes
@@ -73,10 +73,10 @@
   $: yAxis = axisLeft(y)
     .tickPadding(6)
     .tickSize(-innerWidth)
-    .tickFormat($ctx.short);
+    .tickFormat($short);
 </script>
 
-<svg {width} {height}>
+<svg viewBox={`0 0 ${width} ${height}`}>
   <g transform={`translate(${offset},${margin.top})`}>
     <Axis x axis={xAxis} {innerHeight} />
     <Axis y axis={yAxis} lineAtZero={y(0)} />
@@ -125,7 +125,7 @@
       {#each stacks as [currency, account_stacks]}
         {#each account_stacks as stack}
           {@const account = stack.key}
-          <a href={urlForAccount(account)}>
+          <a href={$urlForAccount(account)}>
             <g
               class="category"
               class:faded={highlighted && account !== highlighted}

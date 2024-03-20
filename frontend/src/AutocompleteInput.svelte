@@ -1,3 +1,7 @@
+<!--
+  @component
+  An autocomplete input for fuzzy selection of suggestions.
+-->
 <script lang="ts">
   import { createEventDispatcher } from "svelte";
 
@@ -11,19 +15,29 @@
     select: HTMLInputElement;
   }>();
 
+  /** The currently entered value. */
   export let value: string;
-  export let suggestions: string[];
+  /** The suggestions for the value. */
+  export let suggestions: readonly string[];
+  /** A placeholder for the input field. */
   export let placeholder = "";
+  /** A function to extract the string that should be used for suggestion filtering. */
   export let valueExtractor:
     | ((val: string, input: HTMLInputElement) => string)
     | null = null;
+  /** A function to update the value after selecting a suggestion. */
   export let valueSelector:
     | ((val: string, input: HTMLInputElement) => string)
     | null = null;
+  /** Automatically adjust the size of the input element. */
   export let setSize = false;
+  /** An optional class name to assign to the input element. */
   export let className: string | undefined = undefined;
+  /** A key binding to add for this input. */
   export let key: KeySpec | undefined = undefined;
+  /** A function that checks the entered value for validity. */
   export let checkValidity: ((val: string) => string) | undefined = undefined;
+  /** Whether to show a button to clear the input. */
   export let clearButton = false;
 
   let filteredSuggestions: { suggestion: string; innerHTML: string }[] = [];
@@ -157,11 +171,10 @@
   ul {
     position: absolute;
     z-index: var(--z-index-autocomplete);
-    overflow-x: hidden;
-    overflow-y: auto;
+    overflow: hidden auto;
     background-color: var(--background);
     border: 1px solid var(--border-darker);
-    box-shadow: 0 3px 3px var(--border);
+    box-shadow: var(--box-shadow-dropdown);
   }
 
   :global(aside) ul {

@@ -1,4 +1,5 @@
 """Fava's extension system."""
+
 from __future__ import annotations
 
 import ast
@@ -94,8 +95,15 @@ class FavaExtensionBase:
         func: Callable[[FavaExtensionBase], Any],
         methods: list[str] | None = None,
     ) -> None:
+        """Set the endpoint for an extension."""
         for method in methods or ["GET"]:
             self.endpoints[(endpoint_name, method)] = func
+
+    def after_load_file(self) -> None:
+        """Run after a ledger file has been loaded."""
+
+    def before_request(self) -> None:
+        """Run before each client request."""
 
     def after_entry_modified(self, entry: Directive, new_lines: str) -> None:
         """Run after an `entry` has been modified."""
@@ -167,9 +175,9 @@ def find_extensions(
 
 
 def extension_endpoint(
-    func_or_endpoint_name: Callable[[FavaExtensionBase], Any]
-    | str
-    | None = None,
+    func_or_endpoint_name: (
+        Callable[[FavaExtensionBase], Any] | str | None
+    ) = None,
     methods: list[str] | None = None,
 ) -> (
     Callable[[FavaExtensionBase], Response]
@@ -180,14 +188,16 @@ def extension_endpoint(
 ):
     """Decorator to mark a function as an endpoint.
 
-    Can be used as @extension_endpoint or @extension_endpoint(endpoint_name, methods)
+    Can be used as `@extension_endpoint` or
+    `@extension_endpoint(endpoint_name, methods)`.
 
-    When used as @extension_endpoint, the endpoint name is the name of the function,
-    and methods is "GET"
+    When used as @extension_endpoint, the endpoint name is the name of the
+    function and methods is "GET".
 
-    When used as @extension_endpoint(endpoint_name, methods), the given endpoint name
-    and methods are used, but both are optional. If endpoint_name is None, default to
-    the function name, and if methods is None, default to "GET"
+    When used as @extension_endpoint(endpoint_name, methods), the given
+    endpoint name and methods are used, but both are optional. If
+    endpoint_name is None, default to the function name, and if methods
+    is None, default to "GET".
     """
     endpoint_name = (
         func_or_endpoint_name

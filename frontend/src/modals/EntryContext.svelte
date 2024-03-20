@@ -15,7 +15,7 @@
     <a
       href={urlForSource(
         entry.meta.filename?.toString() ?? "",
-        entry.meta.lineno?.toString() ?? ""
+        entry.meta.lineno?.toString() ?? "",
       )}
     >
       {entry.meta.filename}:{entry.meta.lineno}
@@ -38,7 +38,7 @@
         <tbody>
           {#each Object.entries(balances_before) as [account, inventory]}
             <tr>
-              <td><a href={urlForAccount(account)}>{account}</a></td>
+              <td><a href={$urlForAccount(account)}>{account}</a></td>
               <td>
                 {#each inventory as amount}
                   {amount}
@@ -58,7 +58,7 @@
         <tbody>
           {#each Object.entries(balances_after) as [account, inventory]}
             <tr>
-              <td><a href={urlForAccount(account)}>{account}</a></td>
+              <td><a href={$urlForAccount(account)}>{account}</a></td>
               <td>
                 {#each inventory as amount}
                   {amount}

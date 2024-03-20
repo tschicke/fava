@@ -1,3 +1,5 @@
+# Fava's features
+
 This is an overview of some of the more advanced features that Fava has to
 offer.
 
@@ -32,8 +34,8 @@ inventory, then a line chart or treemap chart is shown on the query page.
     GROUP BY payee, account
 
 Fava supports downloading the result of these queries in various file formats.
-By default, only exporting to `csv` is supported. For support of `xls`, `xlsx`
-and `ods`, install Fava with the `excel` feature:
+By default, only exporting to `csv` is supported. For support of `xlsx` and
+`ods`, install Fava with the `excel` feature:
 
     pip3 install fava[excel]
 
@@ -54,9 +56,9 @@ They are shown next to accounts that have the metadata
 `fava-uptodate-indication: TRUE` set on their Open directive. The colors have
 the following meaning:
 
--   green: The last entry for this account is a balance check that passed.
--   red: The last entry is a balance check that failed.
--   yellow: The last entry is not a balance check.
+- green: The last entry for this account is a balance check that passed.
+- red: The last entry is a balance check that failed.
+- yellow: The last entry is not a balance check.
 
 In addition, a grey dot will be shown if the account has not been updated in a
 while, as configured by the `uptodate-indicator-grey-lookback-days` option.
@@ -66,10 +68,10 @@ while, as configured by the `uptodate-indicator-grey-lookback-days` option.
 To help display only the most relevant subset of accounts when managing a large
 number or a deep hierarchy of accounts, Fava offers the following options:
 
--   `show-closed-accounts`
--   `show-accounts-with-zero-balance`
--   `show-accounts-with-zero-transactions`
--   `collapse-pattern`
+- `show-closed-accounts`
+- `show-accounts-with-zero-balance`
+- `show-accounts-with-zero-transactions`
+- `collapse-pattern`
 
 ## Opening an external editor
 
@@ -100,8 +102,8 @@ example above, or absolute, even linking to an external site.
 Two frequently used custom links are for showing all Documents and all Notes
 found in the journal:
 
--   For all Documents: `/<slug>/journal/?show=document`
--   For all Notes: `/<slug>/journal/?show=note`
+- For all Documents: `/<slug>/journal/?show=document`
+- For all Notes: `/<slug>/journal/?show=note`
 
 There is a special URL handler `/jump` which can be used to jump to the current
 page with given URL parameters. For example, `/jump?time=month` will show the
@@ -160,7 +162,8 @@ transaction and can be filtered in the Journal:
 
     plugin "fava.plugins.link_documents"
 
-### Exporting a Journal view
+### Exporting
 
-When displaying a Journal, including a filtered Journal, the entries displayed
-can be downloaded in Beancount format by clicking the `Export` button.
+The entries that are currently shown in Fava, with filters applied, can be
+downloaded in Beancount format by clicking the ⬇ (Export) button in the
+sidebar.

@@ -1,6 +1,6 @@
 import { derived, writable } from "svelte/store";
 
-import { _, format } from "../i18n";
+import { _ } from "../i18n";
 import iso4217currencies from "../lib/iso4217";
 import { localStorageSyncedStore } from "../lib/store";
 import { array, constant, string, union } from "../lib/validation";
@@ -53,7 +53,7 @@ export const barChartMode = localStorageSyncedStore<"stacked" | "single">(
 );
 
 /** The currencies that are currently not shown in the bar and line charts. */
-export const chartToggledCurrencies = localStorageSyncedStore<string[]>(
+export const chartToggledCurrencies = localStorageSyncedStore(
   "chart-toggled-currencies",
   array(string),
   () => [],
@@ -62,33 +62,27 @@ export const chartToggledCurrencies = localStorageSyncedStore<string[]>(
 /** The currency to show the treemap of. */
 export const treemapCurrency = writable<string | null>(null);
 
-const currencySuggestions = derived(
+/** The currencies to over as conversion options. */
+const currency_suggestions = derived(
   [operating_currency, currencies_sorted, conversion_currencies],
-  ([
-    operating_currency_val,
-    currencies_sorted_val,
-    conversion_currencies_val,
-  ]) =>
-    conversion_currencies_val.length
-      ? conversion_currencies_val
+  ([$operating_currency, $currencies_sorted, $conversion_currencies]) =>
+    $conversion_currencies.length > 0
+      ? $conversion_currencies
       : [
-          ...operating_currency_val,
-          ...currencies_sorted_val.filter(
-            (c) =>
-              !operating_currency_val.includes(c) && iso4217currencies.has(c),
+          ...$operating_currency,
+          ...$currencies_sorted.filter(
+            (c) => !$operating_currency.includes(c) && iso4217currencies.has(c),
           ),
         ],
 );
 
+/** The possible conversion options and their human-readable descriptions. */
 export const conversions = derived(
-  currencySuggestions,
-  (currencySuggestions_val) => [
-    ["at_cost", _("At Cost")],
-    ["at_value", _("At Market Value")],
-    ["units", _("Units")],
-    ...currencySuggestions_val.map((currency) => [
-      currency,
-      format(_("Converted to %(currency)s"), { currency }),
-    ]),
+  currency_suggestions,
+  ($currency_suggestions): readonly string[] => [
+    "at_cost",
+    "at_value",
+    "units",
+    ...$currency_suggestions,
   ],
 );

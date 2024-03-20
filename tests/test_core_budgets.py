@@ -1,4 +1,5 @@
 """Fava's budget syntax."""
+
 from __future__ import annotations
 
 from datetime import date
@@ -31,7 +32,7 @@ def test_budgets(load_doc_custom_entries: list[Custom]) -> None:
         date(2016, 6, 1),
         date(2016, 6, 8),
     )
-    assert empty == {}
+    assert not empty
 
     budgets_ = calculate_budget(
         budgets,

@@ -4,7 +4,7 @@
  * The charts heavily use d3 libraries.
  */
 
-import type { Result } from "../lib/result";
+import { collect, err, type Result } from "../lib/result";
 import { array, object, string, unknown } from "../lib/validation";
 
 import { bar } from "./bar";
@@ -17,15 +17,13 @@ import type { LineChart } from "./line";
 import { scatterplot } from "./scatterplot";
 import type { ScatterPlot } from "./scatterplot";
 
-const parsers: Partial<
-  Record<
-    string,
-    (
-      label: string,
-      json: unknown,
-      ctx: ChartContext,
-    ) => Result<FavaChart, string>
-  >
+const parsers: Record<
+  string,
+  (
+    label: string,
+    json: unknown,
+    $chartContext: ChartContext,
+  ) => Result<FavaChart, string>
 > = {
   balances,
   bar,
@@ -41,19 +39,19 @@ const chart_data_validator = array(
 
 export function parseChartData(
   data: unknown,
-  ctx: ChartContext,
+  $chartContext: ChartContext,
 ): Result<FavaChart[], string> {
-  return chart_data_validator(data).map((chartData) => {
-    const result: FavaChart[] = [];
-    chartData.forEach((chart) => {
-      const parser = parsers[chart.type];
-      if (parser) {
-        const r = parser(chart.label, chart.data, ctx);
-        if (r.is_ok) {
-          result.push(r.value);
-        }
-      }
-    });
-    return result;
-  });
+  return chart_data_validator(data).and_then((chartData) =>
+    collect(
+      chartData.map((chart) => {
+        const parser = parsers[chart.type];
+        return parser
+          ? parser(chart.label, chart.data, $chartContext).map_err(
+              (msg) =>
+                `Parsing of data for ${chart.type} chart failed:\n${msg}`,
+            )
+          : err(`Unknown chart type ${chart.type}`);
+      }),
+    ),
+  );
 }

@@ -1,7 +1,7 @@
 """Account close date and metadata."""
+
 from __future__ import annotations
 
-import datetime
 from dataclasses import dataclass
 from dataclasses import field
 from typing import Dict
@@ -16,8 +16,11 @@ from fava.core.group_entries import group_entries_by_account
 from fava.core.group_entries import TransactionPosting
 from fava.core.module_base import FavaModule
 from fava.core.tree import Tree
+from fava.util.date import local_today
 
 if TYPE_CHECKING:  # pragma: no cover
+    import datetime
+
     from fava.beans.abc import Directive
     from fava.beans.abc import Meta
     from fava.core.tree import TreeNode
@@ -71,12 +74,10 @@ def uptodate_status(
 def balance_string(tree_node: TreeNode) -> str:
     """Balance directive for the given account for today."""
     account = tree_node.name
-    today = str(datetime.date.today())
+    today = str(local_today())
     res = ""
-    for pos in units(tree_node.balance).amounts():
-        res += (
-            f"{today} balance {account:<28} {pos.number:>15} {pos.currency}\n"
-        )
+    for currency, number in units(tree_node.balance).items():
+        res += f"{today} balance {account:<28} {number:>15} {currency}\n"
     return res
 
 
@@ -96,7 +97,7 @@ class AccountData:
     """Holds information about an account."""
 
     #: The date on which this account is closed (or datetime.date.max).
-    close_date: datetime.date = datetime.date.max
+    close_date: datetime.date | None = None
 
     #: The metadata of the Open entry of this account.
     meta: Meta = field(default_factory=dict)
@@ -130,7 +131,7 @@ class AccountDict(FavaModule, Dict[str, AccountData]):
             self[key] = AccountData()
         return self[key]
 
-    def load_file(self) -> None:
+    def load_file(self) -> None:  # noqa: D102
         self.clear()
         entries_by_account = group_entries_by_account(self.ledger.all_entries)
         tree = Tree(self.ledger.all_entries)

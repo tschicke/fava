@@ -18,7 +18,7 @@ import {
 } from "../src/charts/query-charts";
 import { ScatterPlot, scatterplot } from "../src/charts/scatterplot";
 
-import { loadJSONSnapshot } from "./end-to-end-validation.test";
+import { loadJSONSnapshot } from "./helpers";
 
 test("chart helpers (filter ticks)", () => {
   assert.equal(filterTicks(["1", "2", "3"], 2), ["1", "3"]);
@@ -45,7 +45,7 @@ test("chart helpers (pad extent)", () => {
 test("handle data for hierarchical chart", async () => {
   const ctx = { currencies: ["USD"], dateFormat: () => "DATE" };
   assert.ok(hierarchy("name", "", ctx).is_err);
-  const data = await loadJSONSnapshot("test_internal_api.py-test_chart_api");
+  const data = await loadJSONSnapshot("test_internal_api-test_chart_api.json");
   const parsed = parseChartData(data, ctx).unwrap()[0];
   assert.ok(parsed instanceof HierarchyChart);
   assert.equal([...parsed.data.keys()], ["USD"]);
@@ -97,13 +97,12 @@ test("handle data for query charts", () => {
   const ctx = { currencies: ["EUR"], dateFormat: () => "DATE" };
   const d = [{ group: "Assets:Cash", balance: { EUR: 10 } }];
   const { data } = parseGroupedQueryChart(d, ctx).unwrap();
-  assert.is(data.get("EUR")?.value, 10);
+  const eur_hierarchy = data.get("EUR");
+  assert.ok(eur_hierarchy);
+  assert.is(eur_hierarchy.value, 10);
   assert.equal(
-    data
-      .get("EUR")
-      ?.descendants()
-      .map((n) => n.data.account),
-    ["(root)", "Assets", "Assets:Cash"],
+    eur_hierarchy.descendants().map((n) => n.data.account),
+    ["(root)", "Assets", "(root)", "Assets:Cash", "Assets"],
   );
 });
 

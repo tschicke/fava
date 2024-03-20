@@ -1,4 +1,5 @@
 """Alternative implementation of Beancount's Inventory."""
+
 from __future__ import annotations
 
 from decimal import Decimal
@@ -9,17 +10,17 @@ from typing import Optional
 from typing import Tuple
 from typing import TYPE_CHECKING
 
-from fava.beans import create
-from fava.beans.abc import Cost
+from fava.beans.protocols import Cost
 
 if TYPE_CHECKING:  # pragma: no cover
+    import datetime
     from typing import Concatenate
     from typing import Iterable
     from typing import Iterator
     from typing import ParamSpec
 
-    from fava.beans.abc import Amount
-    from fava.beans.abc import Position
+    from fava.beans.protocols import Amount
+    from fava.beans.protocols import Position
 
     P = ParamSpec("P")
 
@@ -29,8 +30,20 @@ InventoryKey = Tuple[str, Optional[Cost]]
 
 
 class _Amount(NamedTuple):
-    currency: str
     number: Decimal
+    currency: str
+
+
+class _Cost(NamedTuple):
+    number: Decimal
+    currency: str
+    date: datetime.date
+    label: str | None
+
+
+class _Position(NamedTuple):
+    units: Amount
+    cost: Cost | None
 
 
 class SimpleCounterInventory(Dict[str, Decimal]):
@@ -48,15 +61,25 @@ class SimpleCounterInventory(Dict[str, Decimal]):
         else:
             self[key] = new_num
 
-    def amounts(self) -> Iterable[_Amount]:
-        """Get the amounts in this inventory."""
-        return (_Amount(currency, number) for currency, number in self.items())
-
     def __iter__(self) -> Iterator[str]:
         raise NotImplementedError
 
     def __neg__(self) -> SimpleCounterInventory:
         return SimpleCounterInventory({key: -num for key, num in self.items()})
+
+    def reduce(
+        self,
+        reducer: Callable[Concatenate[Position, P], Amount],
+        *args: P.args,
+        **_kwargs: P.kwargs,
+    ) -> SimpleCounterInventory:
+        """Reduce inventory."""
+        counter = SimpleCounterInventory()
+        for currency, number in self.items():
+            pos = _Position(_Amount(number, currency), None)
+            amount = reducer(pos, *args)
+            counter.add(amount.currency, amount.number)
+        return counter
 
 
 class CounterInventory(Dict[InventoryKey, Decimal]):
@@ -81,6 +104,17 @@ class CounterInventory(Dict[InventoryKey, Decimal]):
         else:
             self[key] = new_num
 
+    def __iter__(self) -> Iterator[InventoryKey]:
+        raise NotImplementedError
+
+    @staticmethod
+    def from_positions(positions: Iterable[Position]) -> CounterInventory:
+        """Create an inventory from an iterable of Positions."""
+        inv = CounterInventory()
+        for position in positions:
+            inv.add_position(position)
+        return inv
+
     def reduce(
         self,
         reducer: Callable[Concatenate[Position, P], Amount],
@@ -94,7 +128,7 @@ class CounterInventory(Dict[InventoryKey, Decimal]):
         """
         counter = SimpleCounterInventory()
         for (currency, cost), number in self.items():
-            pos = create.position(create.amount((number, currency)), cost)
+            pos = _Position(_Amount(number, currency), cost)
             amount = reducer(pos, *args)
             counter.add(amount.currency, amount.number)
         return counter

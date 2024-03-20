@@ -1,4 +1,5 @@
 """Tests for Fava's main Flask app."""
+
 from __future__ import annotations
 
 from typing import TYPE_CHECKING
@@ -53,22 +54,7 @@ def test_client_side_reports(
     """The client-side rendered reports are generated."""
     result = test_client.get("/long-example/documents/")
     assert result.status_code == 200
-    snapshot(result.get_data(True))
-
-
-@pytest.mark.parametrize("filters", FILTER_COMBINATIONS)
-def test_account_page(
-    test_client: FlaskClient,
-    filters: dict[str, str],
-) -> None:
-    """Account page works without error."""
-    for url in [
-        "/long-example/account/Assets:US:BofA:Checking/",
-        "/long-example/account/Assets:US:BofA:Checking/balances/",
-        "/long-example/account/Assets:US:BofA:Checking/changes/",
-    ]:
-        result = test_client.get(url, query_string=filters)
-        assert result.status_code == 200
+    snapshot(result.get_data(as_text=True))
 
 
 @pytest.mark.parametrize(
@@ -145,7 +131,7 @@ def test_default_path_redirection(
         # pre Werkzeug 2.1:
         expect_url = urljoin("http://localhost/", expect)
         assert result.status_code == 302
-        assert get_url in (expect, expect_url)
+        assert get_url in {expect, expect_url}
 
 
 @pytest.mark.parametrize(
@@ -177,15 +163,15 @@ def test_jump_handler(
         # pre Werkzeug 2.1:
         expect_url = urljoin("http://localhost/", expect)
         assert result.status_code == 302
-        assert get_url in (expect, expect_url)
+        assert get_url in {expect, expect_url}
 
 
-def test_help_ages(test_client: FlaskClient) -> None:
+def test_help_pages(test_client: FlaskClient) -> None:
     """Help pages."""
     result = test_client.get("/long-example/help/")
     assert result.status_code == 200
-    assert f"Fava <code>{fava_version}</code>" in result.get_data(True)
-    assert f"<code>{beancount_version}</code>" in result.get_data(True)
+    assert f"Fava <code>{fava_version}</code>" in result.get_data(as_text=True)
+    assert f"<code>{beancount_version}</code>" in result.get_data(as_text=True)
     result = test_client.get("/long-example/help/filters")
     assert result.status_code == 200
     result = test_client.get("/long-example/help/asdfasdf")
@@ -204,13 +190,13 @@ def test_incognito(test_data_dir: Path) -> None:
     """Numbers get obfuscated in incognito mode."""
     app = create_app([test_data_dir / "example.beancount"], incognito=True)
     test_client = app.test_client()
-    result = test_client.get("/example/balance_sheet/")
+    result = test_client.get("/example/journal/")
     assert result.status_code == 200
-    assert "XXX" in result.get_data(True)
+    assert "XXX" in result.get_data(as_text=True)
 
     result = test_client.get("/example/api/commodities")
     assert result.status_code == 200
-    assert "XXX" not in result.get_data(True)
+    assert "XXX" not in result.get_data(as_text=True)
 
 
 def test_read_only_mode(test_data_dir: Path) -> None:
@@ -239,7 +225,7 @@ def test_download_journal(
         "/long-example/download-journal/",
         query_string={"time": "2016-05-07"},
     )
-    snapshot(result.get_data(True))
+    snapshot(result.get_data(as_text=True))
     assert result.headers["Content-Disposition"].startswith(
         'attachment; filename="journal_',
     )

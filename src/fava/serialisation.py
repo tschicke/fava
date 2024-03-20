@@ -7,10 +7,12 @@ representation of the entry is provided.
 
 This is not intended to work well enough for full roundtrips yet.
 """
+
 from __future__ import annotations
 
 import datetime
 from copy import copy
+from decimal import Decimal
 from functools import singledispatch
 from typing import Any
 
@@ -34,7 +36,7 @@ def serialise(entry: Directive | Posting) -> Any:
     if not isinstance(entry, Directive):
         raise TypeError(f"Unsupported object {entry}")
     ret = entry._asdict()  # type: ignore[attr-defined]
-    ret["type"] = entry.__class__.__name__
+    ret["t"] = entry.__class__.__name__
     return ret
 
 
@@ -44,7 +46,7 @@ def _(entry: Transaction) -> Any:
     ret = entry._asdict()  # type: ignore[attr-defined]
     ret["meta"] = copy(entry.meta)
     ret["meta"].pop("__tolerances__", None)
-    ret["type"] = "Transaction"
+    ret["t"] = "Transaction"
     ret["payee"] = entry.payee or ""
     ret["postings"] = list(map(serialise, entry.postings))
     return ret
@@ -54,7 +56,7 @@ def _(entry: Transaction) -> Any:
 def _(entry: Balance) -> Any:
     """Serialise an entry."""
     ret = entry._asdict()  # type: ignore[attr-defined]
-    ret["type"] = "Balance"
+    ret["t"] = "Balance"
     amt = ret["amount"]
     ret["amount"] = {"number": str(amt.number), "currency": amt.currency}
     return ret
@@ -69,7 +71,11 @@ def _(posting: Posting) -> Any:
 
     if posting.price is not None:
         position_str += f" @ {to_string(posting.price)}"
-    return {"account": posting.account, "amount": position_str}
+
+    ret: dict[str, Any] = {"account": posting.account, "amount": position_str}
+    if posting.meta:
+        ret["meta"] = copy(posting.meta)
+    return ret
 
 
 def deserialise_posting(posting: Any) -> Posting:
@@ -84,7 +90,11 @@ def deserialise_posting(posting: Any) -> Posting:
     if not isinstance(txn, Transaction):
         raise TypeError("Expected transaction")
     pos = txn.postings[0]
-    return replace(pos, account=posting["account"], meta=None)
+    return replace(
+        pos,
+        account=posting["account"],
+        meta=posting.get("meta", {}) or None,
+    )
 
 
 def deserialise(json_entry: Any) -> Directive:
@@ -100,7 +110,7 @@ def deserialise(json_entry: Any) -> Directive:
     date = parse_date(json_entry.get("date", ""))[0]
     if not isinstance(date, datetime.date):
         raise FavaAPIError("Invalid entry date.")
-    if json_entry["type"] == "Transaction":
+    if json_entry["t"] == "Transaction":
         postings = [deserialise_posting(pos) for pos in json_entry["postings"]]
         return create.transaction(
             json_entry["meta"],
@@ -112,10 +122,11 @@ def deserialise(json_entry: Any) -> Directive:
             frozenset(json_entry["links"]),
             postings,
         )
-    if json_entry["type"] == "Balance":
+    if json_entry["t"] == "Balance":
         raw_amount = json_entry["amount"]
         amount = create.amount(
-            f"{raw_amount['number']} {raw_amount['currency']}",
+            Decimal(raw_amount["number"]),
+            raw_amount["currency"],
         )
 
         return create.balance(
@@ -124,7 +135,7 @@ def deserialise(json_entry: Any) -> Directive:
             json_entry["account"],
             amount,
         )
-    if json_entry["type"] == "Note":
+    if json_entry["t"] == "Note":
         comment = json_entry["comment"].replace('"', "")
         return create.note(
             json_entry["meta"],

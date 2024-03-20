@@ -1,35 +1,18 @@
 <script lang="ts">
+  import type { Commodities } from "../../api/validators";
+  import type { FavaChart } from "../../charts";
   import ChartSwitcher from "../../charts/ChartSwitcher.svelte";
-  import { day } from "../../format";
-  import { _ } from "../../i18n";
-  import { sortableTable } from "../../sort";
-  import { ctx } from "../../stores/format";
 
-  import type { PageData } from "./load";
+  import CommodityTable from "./CommodityTable.svelte";
 
-  export let charts: PageData["charts"];
-  export let commodities: PageData["commodities"];
+  export let charts: FavaChart[];
+  export let commodities: Commodities;
 </script>
 
 <ChartSwitcher {charts} />
 {#each commodities as { base, quote, prices }}
   <div class="left">
     <h3>{base} / {quote}</h3>
-    <table use:sortableTable>
-      <thead>
-        <th data-sort="string" data-sort-default="desc" data-order="asc"
-          >{_("Date")}</th
-        >
-        <th data-sort="num">{_("Price")}</th>
-      </thead>
-      <tbody>
-        {#each prices as [date, value]}
-          <tr>
-            <td>{day(date)}</td>
-            <td class="num">{$ctx.amount(value, quote)}</td>
-          </tr>
-        {/each}
-      </tbody>
-    </table>
+    <CommodityTable {prices} {quote} />
   </div>
 {/each}

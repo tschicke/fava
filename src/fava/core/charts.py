@@ -1,4 +1,5 @@
 """Provide data suitable for Fava's charts."""
+
 from __future__ import annotations
 
 from collections import defaultdict
@@ -13,7 +14,6 @@ from typing import Iterable
 from typing import Pattern
 from typing import TYPE_CHECKING
 
-from beancount.core import realization
 from beancount.core.data import Booking
 from beancount.core.data import iter_entry_dates
 from beancount.core.inventory import Inventory
@@ -25,9 +25,10 @@ from simplejson import loads as simplejson_loads
 from fava.beans.abc import Amount
 from fava.beans.abc import Position
 from fava.beans.abc import Transaction
+from fava.beans.account import child_account_tester
 from fava.beans.flags import FLAG_UNREALIZED
 from fava.core.conversion import cost_or_value
-from fava.core.conversion import units
+from fava.core.conversion import simple_units
 from fava.core.inventory import CounterInventory
 from fava.core.module_base import FavaModule
 from fava.core.tree import Tree
@@ -38,25 +39,14 @@ if TYPE_CHECKING:  # pragma: no cover
     from fava.beans.funcs import ResultRow
     from fava.beans.funcs import ResultType
     from fava.core import FilteredLedger
+    from fava.core.conversion import Conversion
     from fava.core.inventory import SimpleCounterInventory
     from fava.core.tree import SerialisedTreeNode
     from fava.util.date import Interval
 
 
 ONE_DAY = timedelta(days=1)
-ZERO = Decimal("0")
-
-
-def inv_to_dict(inventory: Inventory) -> dict[str, Decimal]:
-    """Convert an inventory to a simple cost->number dict."""
-    return {
-        pos.units.currency: pos.units.number
-        for pos in inventory
-        if pos.units.number is not None
-    }
-
-
-Inventory.for_json = inv_to_dict  # type: ignore[attr-defined]
+ZERO = Decimal()
 
 
 def _json_default(o: Any) -> Any:
@@ -81,7 +71,6 @@ def dumps(obj: Any, **_kwargs: Any) -> str:
         indent="  ",
         sort_keys=True,
         default=_json_default,
-        for_json=True,
     )
 
 
@@ -93,11 +82,11 @@ def loads(s: str | bytes) -> Any:
 class FavaJSONProvider(JSONProvider):
     """Use custom JSON encoder and decoder."""
 
-    def dumps(self, obj: Any, **_kwargs: Any) -> str:
+    def dumps(self, obj: Any, **_kwargs: Any) -> str:  # noqa: D102
         return dumps(obj)
 
-    def loads(self, s: str | bytes, **_kwargs: Any) -> Any:
-        return loads(s)
+    def loads(self, s: str | bytes, **_kwargs: Any) -> Any:  # noqa: D102
+        return simplejson_loads(s)
 
 
 @dataclass(frozen=True)
@@ -105,7 +94,7 @@ class DateAndBalance:
     """Balance at a date."""
 
     date: date
-    balance: dict[str, Decimal]
+    balance: SimpleCounterInventory
 
 
 @dataclass(frozen=True)
@@ -125,7 +114,7 @@ class ChartModule(FavaModule):
         self,
         filtered: FilteredLedger,
         account_name: str,
-        conversion: str,
+        conversion: str | Conversion,
         begin: date | None = None,
         end: date | None = None,
     ) -> SerialisedTreeNode:
@@ -145,8 +134,9 @@ class ChartModule(FavaModule):
         self,
         filtered: FilteredLedger,
         interval: Interval,
-        accounts: str | tuple[str],
-        conversion: str,
+        accounts: str | tuple[str, ...],
+        conversion: str | Conversion,
+        *,
         invert: bool = False,
     ) -> Iterable[DateAndBalanceWithBudget]:
         """Render totals for account (or accounts) in the intervals.
@@ -158,7 +148,6 @@ class ChartModule(FavaModule):
             conversion: The conversion to use.
             invert: invert all numbers.
         """
-        # pylint: disable=too-many-locals
         prices = self.ledger.prices
 
         # limit the bar charts to 100 intervals
@@ -223,7 +212,7 @@ class ChartModule(FavaModule):
         self,
         filtered: FilteredLedger,
         account_name: str,
-        conversion: str,
+        conversion: str | Conversion,
     ) -> Iterable[DateAndBalance]:
         """Get the balance of an account as a line chart.
 
@@ -237,46 +226,45 @@ class ChartModule(FavaModule):
             account has changed containing the balance (in units) of the
             account at that date.
         """
-        real_account = realization.get_or_create(
-            filtered.root_account,
-            account_name,
-        )
-        postings = realization.get_postings(real_account)
-        journal = realization.iterate_with_balance(postings)  # type: ignore[arg-type]
+
+        def _balances() -> Iterable[tuple[date, CounterInventory]]:
+            last_date = None
+            running_balance = CounterInventory()
+            is_child_account = child_account_tester(account_name)
+
+            for entry in filtered.entries:
+                for posting in getattr(entry, "postings", []):
+                    if is_child_account(posting.account):
+                        new_date = entry.date
+                        if last_date is not None and new_date > last_date:
+                            yield (last_date, running_balance)
+                        running_balance.add_position(posting)
+                        last_date = new_date
+
+            if last_date is not None:
+                yield (last_date, running_balance)
 
         # When the balance for a commodity just went to zero, it will be
         # missing from the 'balance' so keep track of currencies that last had
         # a balance.
         last_currencies = None
-
         prices = self.ledger.prices
-        for entry, _, change, balance_inventory in journal:
-            if change.is_empty():
-                continue
 
-            balance = inv_to_dict(
-                cost_or_value(
-                    balance_inventory,
-                    conversion,
-                    prices,
-                    entry.date,
-                ),
-            )
-
+        for d, running_bal in _balances():
+            balance = cost_or_value(running_bal, conversion, prices, d)
             currencies = set(balance.keys())
             if last_currencies:
                 for currency in last_currencies - currencies:
                     balance[currency] = ZERO
             last_currencies = currencies
-
-            yield DateAndBalance(entry.date, balance)
+            yield DateAndBalance(d, balance)
 
     @listify
     def net_worth(
         self,
         filtered: FilteredLedger,
         interval: Interval,
-        conversion: str,
+        conversion: str | Conversion,
     ) -> Iterable[DateAndBalance]:
         """Compute net worth.
 
@@ -341,7 +329,7 @@ class ChartModule(FavaModule):
         self,
         types: list[ResultType],
         rows: list[ResultRow],
-    ) -> list[dict[str, date | str | Inventory]]:
+    ) -> list[dict[str, date | str | SimpleCounterInventory]]:
         """Chart for a query.
 
         Args:
@@ -352,6 +340,10 @@ class ChartModule(FavaModule):
             raise FavaAPIError("Can not plot the given chart.")
         if types[0][1] is date:
             return [
-                {"date": date, "balance": units(inv)} for date, inv in rows
+                {"date": date, "balance": simple_units(inv)}
+                for date, inv in rows
             ]
-        return [{"group": group, "balance": units(inv)} for group, inv in rows]
+        return [
+            {"group": group, "balance": simple_units(inv)}
+            for group, inv in rows
+        ]

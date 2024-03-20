@@ -4,6 +4,7 @@ It goes through all entries with a `document` metadata-key, and tries to
 associate them to Document entries. For transactions, it then also adds a link
 from the transaction to documents, as well as the "#linked" tag.
 """
+
 from __future__ import annotations
 
 from collections import defaultdict
@@ -13,9 +14,8 @@ from typing import Any
 from typing import TYPE_CHECKING
 
 from fava.beans.abc import Document
-from fava.beans.abc import Transaction
 from fava.beans.account import get_entry_accounts
-from fava.beans.funcs import hash_entry
+from fava.beans.funcs import get_position
 from fava.beans.helpers import replace
 from fava.helpers import BeancountError
 from fava.util.sets import add_to_set
@@ -52,14 +52,18 @@ def link_documents(
         disk_docs = [
             value
             for key, value in entry.meta.items()
-            if key.startswith("document")
+            if key.startswith("document") and isinstance(value, str)
         ]
 
         if not disk_docs:
             continue
 
-        hash_ = hash_entry(entry)[:8]
+        # Link the documents by using the entry date. This means that this will
+        # not necessarily be unique, but it shows which date the linked entry
+        # is on (and it will probably narrow it down enough)
+        entry_link = f"dok-{entry.date}"
         entry_accounts = get_entry_accounts(entry)
+        entry_filename, _ = get_position(entry)
         for disk_doc in disk_docs:
             documents = [
                 j
@@ -67,7 +71,7 @@ def link_documents(
                 if document.account in entry_accounts
             ]
             disk_doc_path = normpath(
-                Path(entry.meta["filename"]).parent / disk_doc,
+                Path(entry_filename).parent / disk_doc,
             )
             if disk_doc_path in by_fullname:
                 documents.append(by_fullname[disk_doc_path])
@@ -88,16 +92,16 @@ def link_documents(
                 doc: Document = entries[j]  # type: ignore[assignment]
                 entries[j] = replace(
                     doc,
-                    links=add_to_set(doc.links, hash_),
+                    links=add_to_set(doc.links, entry_link),
                     tags=add_to_set(doc.tags, "linked"),
                 )
 
             # The other entry types do not support links, so only add links for
             # txns.
-            if isinstance(entry, Transaction):
+            if hasattr(entry, "links"):
                 entries[index] = replace(
                     entry,
-                    links=add_to_set(entry.links, hash_),
+                    links=add_to_set(entry.links, entry_link),
                 )
 
     return entries, errors

@@ -5,6 +5,8 @@
   import { currencies } from "../stores";
 
   import AccountInput from "./AccountInput.svelte";
+  import AddMetadataButton from "./AddMetadataButton.svelte";
+  import EntryMetadata from "./EntryMetadata.svelte";
 
   export let posting: Posting;
   export let index: number;
@@ -12,7 +14,6 @@
   export let date: string | undefined;
   export let move: (arg: { from: number; to: number }) => void;
   export let remove: () => void;
-  export let add: () => void;
 
   $: amount_number = posting.amount.replace(/[^\-?0-9.]/g, "");
   $: amountSuggestions = $currencies.map((c) => `${amount_number} ${c}`);
@@ -76,19 +77,13 @@
     suggestions={amountSuggestions}
     bind:value={posting.amount}
   />
-  <button
-    type="button"
-    class="muted round add-row"
-    on:click={add}
-    title={_("Add posting")}
-  >
-    +
-  </button>
+  <AddMetadataButton bind:meta={posting.meta} />
+  <EntryMetadata bind:meta={posting.meta} />
 </div>
 
 <style>
   .drag {
-    box-shadow: 0 0 5px var(--text-color);
+    box-shadow: var(--box-shadow-button);
   }
 
   div {
@@ -100,20 +95,12 @@
     cursor: initial;
   }
 
-  div .add-row {
-    display: none;
-  }
-
-  div:last-child .add-row {
-    display: initial;
+  div:last-child .remove-row {
+    visibility: hidden;
   }
 
   div :global(.amount) {
     width: 220px;
-  }
-
-  div:last-child :global(.amount) {
-    width: 192px;
   }
 
   @media (width <= 767px) {

@@ -38,7 +38,8 @@
 {% for link_ in entry.links|sort %}<span class="link">^{{ link_ }}</span>{% endfor %}
 {%- endmacro %}
 
-{% macro journal_table(entries, show_change_and_balance=False) %}
+{% macro journal_table(entries, show_change_and_balance=False, ledger=None) %}
+{% set ledger = ledger or g.ledger %}
 {% autoescape false %}
 <fava-journal>
 <ol class="flex-table journal">
@@ -113,10 +114,10 @@
         {% endif %}
         {% if show_change_and_balance %}
           <span class="change num">
-          {%- for pos in change|cost_or_value(entry.date) %}{{ commodity_macros.render_amount(ledger, pos.units) }}<br>{% endfor -%}
+          {%- for currency, number in change.items() %}{{ commodity_macros.render_num(ledger, currency, number) }}<br>{% endfor -%}
           </span>
           <span class="num">
-          {%- for pos in balance|cost_or_value(entry.date) %}{{ commodity_macros.render_amount(ledger, pos.units) }}<br>{% endfor -%}
+          {%- for currency, number in balance.items() %}{{ commodity_macros.render_num(ledger, currency, number) }}<br>{% endfor -%}
           </span>
         {% endif %}
         </p>

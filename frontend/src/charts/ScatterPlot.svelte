@@ -37,9 +37,9 @@
 
   /** Quadtree for hover. */
   $: quad = quadtree(
-    chart.data,
+    [...chart.data],
     (d) => x(d.date),
-    (d) => y(d.type) ?? 0
+    (d) => y(d.type) ?? 0,
   );
 
   function tooltipText(d: ScatterPlotDatum) {
@@ -52,7 +52,7 @@
   };
 </script>
 
-<svg {width} {height}>
+<svg viewBox={`0 0 ${width} ${height}`}>
   <g
     use:positionedTooltip={tooltipFindNode}
     transform={`translate(${margin.left},${margin.top})`}

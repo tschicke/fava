@@ -38,7 +38,7 @@
 
     return [
       domHelpers.t(
-        `${$ctx.amount(val, currency)} (${formatPercentage(val / rootValue)})`
+        `${$ctx.amount(val, currency)} (${formatPercentage(val / rootValue)})`,
       ),
       domHelpers.em(d.data.account),
     ];
@@ -59,14 +59,14 @@
   };
 </script>
 
-<svg {width} {height}>
+<svg viewBox={`0 0 ${width} ${height}`}>
   {#each leaves as d}
     <g
       transform={`translate(${d.x0},${d.y0})`}
       use:followingTooltip={() => tooltipText(d)}
     >
       <rect fill={fill(d)} width={d.x1 - d.x0} height={d.y1 - d.y0} />
-      <a href={urlForAccount(d.data.account)}>
+      <a href={$urlForAccount(d.data.account)}>
         <text
           use:setVisibility={d}
           dy=".5em"

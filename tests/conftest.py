@@ -1,10 +1,10 @@
 """Test fixtures."""
-# pylint: disable=redefined-outer-name
+
 from __future__ import annotations
 
-import datetime
 import os
 import re
+import shutil
 from pathlib import Path
 from pprint import pformat
 from textwrap import dedent
@@ -20,9 +20,12 @@ from fava.beans.abc import Custom
 from fava.beans.load import load_string
 from fava.core import FavaLedger
 from fava.core.budgets import parse_budgets
+from fava.core.charts import dumps
+from fava.util.date import local_today
 
 if TYPE_CHECKING:  # pragma: no cover
     from typing import Literal
+    from typing import Protocol
     from typing import TypeAlias
     from typing import TypeGuard
 
@@ -33,7 +36,18 @@ if TYPE_CHECKING:  # pragma: no cover
     from fava.beans.types import LoaderResult
     from fava.core.budgets import BudgetDict
 
-    SnapshotFunc: TypeAlias = Callable[[Any], None]
+    class SnapshotFunc(Protocol):
+        """Callable protocol for the snapshot function."""
+
+        def __call__(
+            self,
+            data: Any,
+            /,
+            *,
+            name: str = ...,
+            json: bool = ...,
+        ) -> None:
+            """Check snapshot."""
 
 
 @pytest.fixture(scope="session")
@@ -74,30 +88,42 @@ def snapshot(
 ) -> SnapshotFunc:
     """Create a snaphot for some given data."""
     fn_name = request.function.__name__
-    module_name = module_path.name
+    module_name = module_path.stem
 
-    def snapshot_data(data: Any) -> None:
+    def snapshot_data(
+        data: Any,
+        name: str | None = None,
+        *,
+        json: bool = False,
+    ) -> None:
         if os.environ.get("SNAPSHOT_IGNORE"):
-            # For the tests with old dependencies, we avoid comparing the snapshots,
-            # as they might change in subtle ways between dependency versions.
+            # For the tests runs with old dependencies, we avoid comparing
+            # the snapshots, as they might change in subtle ways between
+            # dependency versions.
             return
 
         snap_count[fn_name] += 1
-        filename = (
-            f"{module_name}-{fn_name}"
-            if snap_count[fn_name] == 1
-            else (f"{module_name}-{fn_name}-{snap_count[fn_name]}")
-        )
+        filename = f"{module_name}-{fn_name}"
+        if name:
+            filename = f"{filename}-{name}"
+        elif snap_count[fn_name] > 1:
+            filename = f"{filename}-{snap_count[fn_name]}"
+
+        if json:
+            if not isinstance(data, str):
+                data = dumps(data)
+            filename += ".json"
+
         snap_file = snap_dir / filename
 
         # print strings directly, otherwise try pretty-printing
         out = data if isinstance(data, str) else pformat(data)
         # replace today
-        out = out.replace(str(datetime.date.today()), "TODAY")
-        # replace relative dates
-        out = re.sub(r"\d+ days ago", "X days ago", out)
+        today = local_today()
+        out = out.replace(str(today), "TODAY")
         # replace entry hashes
-        out = re.sub(r'"[0-9a-f]{32}"', '"ENTRY_HASH"', out)
+        out = re.sub(r'"[0-9a-f]{32}', '"ENTRY_HASH', out)
+        out = re.sub(r"context-[0-9a-f]{32}", "context-ENTRY_HASH", out)
         # replace mtimes
         out = re.sub(r"mtime=\d+", "mtime=MTIME", out)
         out = re.sub(r'id="ledger-mtime">\d+', 'id="ledger-mtime">MTIME', out)
@@ -151,6 +177,17 @@ def app(test_data_dir: Path) -> Flask:
 
 
 @pytest.fixture()
+def app_in_tmp_dir(test_data_dir: Path, tmp_path: Path) -> Flask:
+    """Get a Fava Flask app in a tmp_dir."""
+    ledger_path = tmp_path / "edit-example.beancount"
+    shutil.copy(test_data_dir / "edit-example.beancount", ledger_path)
+    ledger_path.chmod(tmp_path.stat().st_mode)
+    fava_app = create_app([str(ledger_path)], load=True)
+    fava_app.testing = True
+    return fava_app
+
+
+@pytest.fixture()
 def test_client(app: Flask) -> FlaskClient:
     """Get the test client for the Fava Flask app."""
     return app.test_client()
@@ -190,7 +227,7 @@ def budgets_doc(load_doc_custom_entries: list[Custom]) -> BudgetDict:
     return budgets
 
 
-if TYPE_CHECKING:
+if TYPE_CHECKING:  # pragma: no cover
     #: Slugs of the ledgers that are loaded for the test cases.
     LedgerSlug: TypeAlias = Literal[
         "example",

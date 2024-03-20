@@ -1,4 +1,5 @@
 """Parsing and computing budgets."""
+
 from __future__ import annotations
 
 from collections import Counter
@@ -33,6 +34,7 @@ class Budget(NamedTuple):
 
 
 BudgetDict = Dict[str, List[Budget]]
+"""A map of account names to lists of budget entries."""
 
 
 class BudgetError(BeancountError):
@@ -46,7 +48,7 @@ class BudgetModule(FavaModule):
         super().__init__(ledger)
         self.budget_entries: BudgetDict = {}
 
-    def load_file(self) -> None:
+    def load_file(self) -> None:  # noqa: D102
         self.budget_entries, errors = parse_budgets(
             self.ledger.all_entries_by_type.Custom,
         )
@@ -138,8 +140,7 @@ def parse_budgets(
 
 
 def _matching_budgets(
-    budgets: BudgetDict,
-    accounts: str,
+    budgets: list[Budget],
     date_active: datetime.date,
 ) -> dict[str, Budget]:
     """Find matching budgets.
@@ -149,7 +150,7 @@ def _matching_budgets(
         specified account.
     """
     last_seen_budgets = {}
-    for budget in budgets[accounts]:
+    for budget in budgets:
         if budget.date_start <= date_active:
             last_seen_budgets[budget.currency] = budget
         else:
@@ -175,21 +176,18 @@ def calculate_budget(
         A dictionary of currency to Decimal with the budget for the
         specified account and period.
     """
-    if account not in budgets:
+    budget_list = budgets.get(account, None)
+    if budget_list is None:
         return {}
 
     currency_dict: dict[str, Decimal] = defaultdict(Decimal)
 
-    for single_day in days_in_daterange(date_from, date_to):
-        matches = _matching_budgets(budgets, account, single_day)
+    for day in days_in_daterange(date_from, date_to):
+        matches = _matching_budgets(budget_list, day)
         for budget in matches.values():
-            currency_dict[
-                budget.currency
-            ] += budget.number / number_of_days_in_period(
-                budget.period,
-                single_day,
-            )
-    return currency_dict
+            days_in_period = number_of_days_in_period(budget.period, day)
+            currency_dict[budget.currency] += budget.number / days_in_period
+    return dict(currency_dict)
 
 
 def calculate_budget_children(
@@ -217,4 +215,4 @@ def calculate_budget_children(
             currency_dict.update(
                 calculate_budget(budgets, child, date_from, date_to),
             )
-    return currency_dict
+    return dict(currency_dict)

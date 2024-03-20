@@ -56,12 +56,13 @@
   <slot />
   <button
     type="button"
+    class="show-charts"
     on:click={() => {
       showCharts.update((v) => !v);
     }}
-    class:closed={!$showCharts}
-    class="toggle-chart"
-  />
+  >
+    {$showCharts ? "▼" : "◀"}
+  </button>
 </div>
 <div hidden={!$showCharts} bind:clientWidth={width}>
   {#if width}
@@ -78,25 +79,9 @@
 </div>
 
 <style>
-  .toggle-chart {
-    height: 22px;
-    padding: 2px 6px;
-    margin: 0;
-  }
-
-  .toggle-chart::before {
-    display: block;
-    content: "";
-    border: 0;
-    border-top: 13px solid var(--background);
-    border-right: 9px solid transparent;
-    border-left: 9px solid transparent;
-  }
-
-  .toggle-chart.closed::before {
-    border: 0;
-    border-right: 9px solid transparent;
-    border-bottom: 13px solid var(--background);
-    border-left: 9px solid transparent;
+  @media print {
+    button.show-charts {
+      display: none;
+    }
   }
 </style>

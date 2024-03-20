@@ -5,7 +5,7 @@ import {
   LanguageSupport,
   syntaxHighlighting,
 } from "@codemirror/language";
-import { keymap } from "@codemirror/view";
+import { highlightTrailingWhitespace, keymap } from "@codemirror/view";
 import { styleTags, tags } from "@lezer/highlight";
 import TSParser from "web-tree-sitter";
 import ts_wasm from "web-tree-sitter/tree-sitter.wasm";
@@ -21,11 +21,8 @@ import { LezerTSParser } from "./tree-sitter-parser";
 
 /** Import the tree-sitter and Beancount language WASM files and initialise the parser. */
 async function loadBeancountParser(): Promise<TSParser> {
-  const ts = await import.meta.resolve?.(ts_wasm);
-  const ts_beancount = await import.meta.resolve?.(ts_beancount_wasm);
-  if (!ts || !ts_beancount) {
-    throw new Error("Could not resolve WASM paths.");
-  }
+  const ts = import.meta.resolve(ts_wasm);
+  const ts_beancount = import.meta.resolve(ts_beancount_wasm);
   await TSParser.init({ locateFile: () => ts });
   const lang = await TSParser.Language.load(ts_beancount);
   const parser = new TSParser();
@@ -44,6 +41,7 @@ const beancountLanguageSupportExtensions = [
     commentTokens: { line: ";" },
     indentOnInput: /^\s+\d\d\d\d/,
   }),
+  highlightTrailingWhitespace(),
 ];
 
 /** The node props that allow for highlighting/coloring of the code. */

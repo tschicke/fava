@@ -22,12 +22,12 @@
   <h3>{{ _('Update Activity') }}<copyable-text class="button right" title="
   {{- _('Click to copy balance directives for accounts (except green ones) to the clipboard.') -}}
   " data-clipboard-text="{{ ledger.accounts.all_balance_directives() }}">{{ _('Copy balance directives') }}</copyable-text></h3>
-  <table is="sortable-table" class="statistics-update-activity">
+  <table is="sortable-table">
     <thead>
       <tr>
         <th data-sort="string" data-order="asc">{{ _('Account') }}</th>
-        <th class="indicator-header" data-sort="num" data-sort-default="desc"></th>
-        <th class="indicator-header" data-sort="num" data-sort-default="desc"></th>
+        <th class="indicator-header" data-sort="num"></th>
+        <th class="indicator-header" data-sort="num"></th>
         <th data-sort="string">{{ _('Last Entry') }}</th>
         <th>{{ _('Balance') }}</th>
       </tr>
@@ -40,16 +40,16 @@
       <tr>
         <td class="account"><a href="{{ url_for('account', name=account) }}">{{ account }}</a></td>
         {% if ledger.accounts[account].uptodate_status %}
-        <td data-sort-value="{{ status_sortorder[ledger.accounts[account].uptodate_status] }}" class="uptodate-indicator">{{ account_macros.indicator(ledger, account) }}</td>
-        <td class="uptodate-indicator">{{ account_macros.last_account_activity(ledger, account) }}</td>
+        <td data-sort-value="{{ status_sortorder[ledger.accounts[account].uptodate_status] }}">{{ account_macros.indicator(ledger, account) }}</td>
+        <td>{{ account_macros.last_account_activity(ledger, account) }}</td>
         {% else %}
-        <td data-sort-value="0" class="uptodate-indicator"></td>
-        <td class="uptodate-indicator"></td>
+        <td data-sort-value="0"></td>
+        <td></td>
         {% endif %}
         <td><a href="#context-{{ last_entry.entry_hash }}">{{ last_entry.date }}</a></td>
         <td class="num">
-          {%- for amt in ((g.filtered.root_tree.get(account)).balance|units).amounts() -%}
-          {{ commodity_macros.render_amount(ledger, amt) }}<br>
+          {%- for currency, number in ((g.filtered.root_tree.get(account)).balance|units).items() -%}
+          {{ commodity_macros.render_num(ledger, currency, number) }}<br>
           {% endfor -%}
         </td>
       </tr>

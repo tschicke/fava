@@ -14,20 +14,22 @@ import { err, ok } from "./result";
  * That is, a function that checks an unknown object to be of a specified type.
  */
 export type Validator<T> = (json: unknown) => Result<T, string>;
+/** A validator that will never error. */
 export type SafeValidator<T> = (json: unknown) => Ok<T>;
 
+/** Extract the validated type. */
 export type ValidationT<R> = R extends Validator<infer T> ? T : never;
 
 /**
- * Validate as unknown (noop).
+ * Validate with a default value if validation fails.
  */
 export function defaultValue<T>(
   validator: Validator<T>,
-  value: T,
+  value: () => T,
 ): SafeValidator<T> {
   return (json) => {
     const res = validator(json);
-    return res.is_ok ? res : ok(value);
+    return res.is_ok ? res : ok(value());
   };
 }
 
@@ -43,7 +45,7 @@ export const string: Validator<string> = (json) =>
   typeof json === "string" ? ok(json) : err("string validation failed.");
 
 /** Validate a string and return the empty string on failure. */
-export const optional_string = defaultValue(string, "");
+export const optional_string = defaultValue(string, () => "");
 
 /**
  * Validate a boolean.
@@ -168,9 +170,6 @@ export function isJsonObject(json: unknown): json is Record<string, unknown> {
   return typeof json === "object" && json !== null && !Array.isArray(json);
 }
 
-// eslint-disable-next-line
-const { hasOwnProperty } = Object.prototype;
-
 /**
  * Validator for an object with some given properties.
  */
@@ -182,7 +181,7 @@ export function object<T>(validators: {
       const obj: Partial<T> = {};
       // eslint-disable-next-line no-restricted-syntax
       for (const key in validators) {
-        if (hasOwnProperty.call(validators, key)) {
+        if (Object.hasOwn(validators, key)) {
           const res = validators[key](json[key]);
           if (res.is_ok) {
             obj[key] = res.value;

@@ -1,4 +1,5 @@
 """Abstract base classes for Beancount types."""
+
 from __future__ import annotations
 
 from abc import ABC
@@ -12,11 +13,16 @@ from beancount.core import position
 
 if TYPE_CHECKING:  # pragma: no cover
     import datetime
+    from collections.abc import Mapping
     from decimal import Decimal
     from typing import TypeAlias
 
-    MetaValue: TypeAlias = Any
-    Meta: TypeAlias = dict[str, MetaValue]
+    from fava.beans import protocols
+
+    MetaValue: TypeAlias = (
+        str | int | bool | Decimal | datetime.date | protocols.Amount
+    )
+    Meta: TypeAlias = Mapping[str, MetaValue]
     TagsOrLinks: TypeAlias = set[str] | frozenset[str]
 
 

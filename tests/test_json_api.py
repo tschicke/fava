@@ -1,8 +1,6 @@
 from __future__ import annotations
 
 import datetime
-import hashlib
-import re
 from io import BytesIO
 from pathlib import Path
 from typing import Any
@@ -12,10 +10,8 @@ import pytest
 
 from fava.beans.funcs import hash_entry
 from fava.context import g
-from fava.core.charts import dumps
-from fava.core.fava_options import InsertEntryOption
+from fava.core.file import _sha256_str
 from fava.core.file import get_entry_slice
-from fava.core.file import insert_entry
 from fava.core.misc import align
 from fava.json_api import validate_func_arguments
 from fava.json_api import ValidationError
@@ -71,7 +67,7 @@ def assert_api_success(response: TestResponse, data: Any | None = None) -> Any:
 
 def test_api_changed(test_client: FlaskClient) -> None:
     response = test_client.get("/long-example/api/changed")
-    assert_api_success(response, False)
+    assert_api_success(response, data=False)
 
 
 def test_api_add_document(
@@ -177,7 +173,7 @@ def test_api_context(
         query_string={"entry_hash": entry_hash},
     )
     data = assert_api_success(response)
-    snapshot(data)
+    snapshot(data, json=True)
 
     entry_hash = hash_entry(example_ledger.all_entries[10])
     response = test_client.get(
@@ -185,7 +181,7 @@ def test_api_context(
         query_string={"entry_hash": entry_hash},
     )
     data = assert_api_success(response)
-    snapshot(data)
+    snapshot(data, json=True)
     assert not data.get("balances_before")
 
 
@@ -202,7 +198,7 @@ def test_api_payee_accounts(
     data = assert_api_success(response)
     assert data[0] == "Assets:US:BofA:Checking"
     assert data[1] == "Expenses:Home:Electricity"
-    snapshot(data)
+    snapshot(data, json=True)
 
 
 def test_api_payee_transaction(
@@ -214,7 +210,7 @@ def test_api_payee_transaction(
         query_string={"payee": "EDISON POWER"},
     )
     data = assert_api_success(response)
-    snapshot(data)
+    snapshot(data, json=True)
 
 
 def test_api_imports(
@@ -224,7 +220,7 @@ def test_api_imports(
     response = test_client.get("/import/api/imports")
     data = assert_api_success(response)
     assert data
-    snapshot(data)
+    snapshot(data, json=True)
 
     importable = next(f for f in data if f["importers"])
     assert importable
@@ -237,7 +233,7 @@ def test_api_imports(
         },
     )
     data = assert_api_success(response)
-    snapshot(data)
+    snapshot(data, json=True)
 
 
 def test_api_move(test_client: FlaskClient) -> None:
@@ -282,46 +278,46 @@ def test_api_get_source_unknown_file(test_client: FlaskClient) -> None:
     assert "Trying to read a non-source file" in err_msg
 
 
-def test_api_source_put(
-    test_client: FlaskClient,
-    example_ledger: FavaLedger,
-) -> None:
-    path = Path(example_ledger.beancount_file_path)
+def test_api_source_put(app_in_tmp_dir: Flask) -> None:
+    test_client = app_in_tmp_dir.test_client()
+    ledger = app_in_tmp_dir.config["LEDGERS"]["edit-example"]
+    path = Path(ledger.beancount_file_path)
 
-    url = "/long-example/api/source"
+    url = "/edit-example/api/source"
     # test bad request
     response = test_client.put(url)
     assert_api_error(response, "Invalid JSON request.")
 
-    payload = path.read_text("utf-8")
-    sha256sum = hashlib.sha256(path.read_bytes()).hexdigest()
+    source = path.read_text("utf-8")
+    changed_source = source + "\n;comment"
+    sha256sum = _sha256_str(source)
 
     # change source
     response = test_client.put(
         url,
         json={
-            "source": "asdf" + payload,
+            "source": changed_source,
             "sha256sum": sha256sum,
             "file_path": str(path),
         },
     )
-    sha256sum = hashlib.sha256(path.read_bytes()).hexdigest()
+    sha256sum = _sha256_str(changed_source)
     assert_api_success(response, sha256sum)
 
     # check if the file has been written
-    assert path.read_text("utf-8") == "asdf" + payload
+    assert path.read_text("utf-8") == changed_source
 
     # write original source file
     result = test_client.put(
         url,
         json={
-            "source": payload,
+            "source": source,
             "sha256sum": sha256sum,
             "file_path": str(path),
         },
     )
     assert result.status_code == 200
-    assert path.read_text("utf-8") == payload
+    assert path.read_text("utf-8") == source
 
 
 def test_api_format_source(
@@ -356,50 +352,35 @@ def test_api_format_source_options(
         assert_api_success(response, align(payload, 90))
 
 
-def test_api_source_slice_delete(
-    test_client: FlaskClient,
-    example_ledger: FavaLedger,
-) -> None:
-    path = Path(example_ledger.beancount_file_path)
-    contents = path.read_text("utf-8")
+def test_api_source_slice_delete(app_in_tmp_dir: Flask) -> None:
+    test_client = app_in_tmp_dir.test_client()
+    ledger = app_in_tmp_dir.config["LEDGERS"]["edit-example"]
+    path = Path(ledger.beancount_file_path)
 
-    url = "/long-example/api/source_slice"
+    contents = path.read_text("utf-8")
+    assert '2016-05-03 * "Chichipotle" "Eating out with Joe"' in contents
+
+    url = "/edit-example/api/source_slice"
     # test bad request
     response = test_client.delete(url)
     assert_api_error(
-        response,
-        "Invalid API request: Parameter `entry_hash` is missing.",
+        response, "Invalid API request: Parameter `entry_hash` is missing."
     )
 
-    entry = next(
-        entry
-        for entry in example_ledger.all_entries_by_type.Transaction
-        if entry.payee == "Chichipotle"
-        and entry.date == datetime.date(2016, 5, 3)
-    )
+    entry = ledger.all_entries[-1]
     entry_hash = hash_entry(entry)
-    entry_source, sha256sum = get_entry_slice(entry)
+    _entry_source, sha256sum = get_entry_slice(entry)
 
     # delete entry
     response = test_client.delete(
         url,
-        query_string={
-            "entry_hash": entry_hash,
-            "sha256sum": sha256sum,
-        },
+        query_string={"entry_hash": entry_hash, "sha256sum": sha256sum},
     )
     assert_api_success(response, f"Deleted entry {entry_hash}.")
-
-    assert path.read_text("utf-8") != contents
-
-    insert_option = InsertEntryOption(
-        datetime.date(1, 1, 1),
-        re.compile(".*"),
-        entry.meta["filename"],
-        entry.meta["lineno"],
+    assert (
+        '2016-05-03 * "Chichipotle" "Eating out with Joe"'
+        not in path.read_text("utf-8")
     )
-    insert_entry(entry, entry.meta["filename"], [insert_option], 59, 2)
-    assert path.read_text("utf-8") == contents
 
 
 def test_api_add_entries(
@@ -416,7 +397,7 @@ def test_api_add_entries(
 
         entries = [
             {
-                "type": "Transaction",
+                "t": "Transaction",
                 "date": "2017-12-12",
                 "flag": "*",
                 "payee": "Test3",
@@ -430,7 +411,7 @@ def test_api_add_entries(
                 ],
             },
             {
-                "type": "Transaction",
+                "t": "Transaction",
                 "date": "2017-01-12",
                 "flag": "*",
                 "payee": "Test1",
@@ -444,7 +425,7 @@ def test_api_add_entries(
                 ],
             },
             {
-                "type": "Transaction",
+                "t": "Transaction",
                 "date": "2017-02-12",
                 "flag": "*",
                 "payee": "Test",
@@ -464,7 +445,9 @@ def test_api_add_entries(
         response = test_client.put(url, json={"entries": entries})
         assert_api_success(response, "Stored 3 entries.")
 
-        assert test_file.read_text("utf-8") == """
+        assert (
+            test_file.read_text("utf-8")
+            == """
 2017-01-12 * "Test1" ""
   Assets:US:ETrade:Cash                                 100 USD
   Assets:US:ETrade:GLD
@@ -477,6 +460,7 @@ def test_api_add_entries(
   Assets:US:ETrade:Cash                                 100 USD
   Assets:US:ETrade:GLD
 """
+        )
 
 
 @pytest.mark.parametrize(
@@ -505,7 +489,7 @@ def test_api_query_result_error(test_client: FlaskClient) -> None:
         query_string={"query_string": "nononono"},
     )
     assert response.status_code == 200
-    assert "ERROR: Syntax error near" in response.get_data(True)
+    assert "ERROR: Syntax error near" in response.get_data(as_text=True)
 
 
 def test_api_query_result_filters(test_client: FlaskClient) -> None:
@@ -532,26 +516,55 @@ def test_api_query_result_charts(
     )
     data = assert_api_success(response)
     assert data["chart"]
-    snapshot(data["chart"])
+    snapshot(data["chart"], json=True)
 
 
-def test_api_commodities(
+def test_api_commodities_empty(
     test_client: FlaskClient,
-    snapshot: SnapshotFunc,
 ) -> None:
-    response = test_client.get("/long-example/api/commodities")
-    data = assert_api_success(response)
-    snapshot(data)
-
     response = test_client.get(
-        "/long-example/api/commodities",
-        query_string={"time": "3000"},
+        "/long-example/api/commodities?time=3000",
     )
     data = assert_api_success(response)
     assert not data
 
 
-def test_api_events(test_client: FlaskClient, snapshot: SnapshotFunc) -> None:
-    response = test_client.get("/long-example/api/events")
+@pytest.mark.parametrize(
+    ("name", "url"),
+    [
+        ("commodities", "/long-example/api/commodities"),
+        ("documents", "/example/api/documents"),
+        ("events", "/long-example/api/events"),
+        ("income_statement", "/long-example/api/income_statement?time=2014"),
+        ("trial_balance", "/long-example/api/trial_balance?time=2014"),
+        ("balance_sheet", "/long-example/api/balance_sheet"),
+        (
+            "balance_sheet_with_cost",
+            "/long-example/api/balance_sheet?conversion=at_value",
+        ),
+        (
+            "account_report_off_by_one_journal",
+            (
+                "/off-by-one/api/account_report"
+                "?interval=day&conversion=at_value&a=Assets"
+            ),
+        ),
+        (
+            "account_report_off_by_one",
+            (
+                "/off-by-one/api/account_report"
+                "?interval=day&conversion=at_value&a=Assets&r=balances"
+            ),
+        ),
+    ],
+)
+def test_api(
+    test_client: FlaskClient,
+    snapshot: SnapshotFunc,
+    name: str,
+    url: str,
+) -> None:
+    response = test_client.get(url)
     data = assert_api_success(response)
-    snapshot(dumps(data))
+    assert data
+    snapshot(data, name=name, json=True)

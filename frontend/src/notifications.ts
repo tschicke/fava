@@ -7,8 +7,13 @@ const notificationList = (() => {
     if (value === null) {
       value = document.createElement("div");
       value.className = "notifications";
+      value.style.right = "10px";
       document.body.appendChild(value);
     }
+    // always update the distance to top to account for the current header height
+    const headerHeight =
+      document.querySelector("header")?.getBoundingClientRect().height ?? 50;
+    value.style.top = `${headerHeight + 10}px`;
     return value;
   };
 })();
@@ -26,7 +31,6 @@ type NotificationType = "info" | "warning" | "error";
  */
 export function notify(
   msg: string,
-  // eslint-disable-next-line default-param-last
   cls: NotificationType = "info",
   callback?: () => void,
 ): void {
@@ -41,6 +45,15 @@ export function notify(
   setTimeout(() => {
     notification.remove();
   }, 5000);
+}
+
+/**
+ * Notify the user about an warning and log to console.
+ */
+export function notify_warn(msg: string): void {
+  notify(msg, "warning");
+  // eslint-disable-next-line no-console
+  console.warn(msg);
 }
 
 /**

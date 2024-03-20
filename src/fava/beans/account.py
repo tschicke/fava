@@ -1,4 +1,5 @@
 """Account name helpers."""
+
 from __future__ import annotations
 
 from typing import TYPE_CHECKING
@@ -10,6 +11,8 @@ from fava.beans.abc import Pad
 from fava.beans.abc import Transaction
 
 if TYPE_CHECKING:  # pragma: no cover
+    from typing import Callable
+
     from fava.beans.abc import Directive
 
 
@@ -23,6 +26,16 @@ def root(acc: str) -> str:
     """Get root account of the given account."""
     parts = acc.split(":", maxsplit=1)
     return parts[0]
+
+
+def child_account_tester(acc: str) -> Callable[[str], bool]:
+    """Get a function to check if an account is a descendant of the account."""
+    acc_as_parent = acc + ":"
+
+    def is_child_account(a: str) -> bool:
+        return a == acc or a.startswith(acc_as_parent)
+
+    return is_child_account
 
 
 def get_entry_accounts(entry: Directive) -> list[str]:

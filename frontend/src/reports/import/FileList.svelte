@@ -3,7 +3,7 @@
   import AccountInput from "../../entry-forms/AccountInput.svelte";
   import { _ } from "../../i18n";
 
-  import type { ProcessedImportableFile } from "./load";
+  import type { ProcessedImportableFile } from ".";
 
   export let files: ProcessedImportableFile[];
   export let extractCache: Map<string, Entry[]>;
@@ -17,6 +17,7 @@
   <div class="header" title={file.name} class:selected={selected === file.name}>
     <button
       type="button"
+      class="unset"
       on:click={() => {
         selected = selected === file.name ? null : file.name;
       }}>{file.basename}</button
@@ -76,9 +77,7 @@
   }
 
   .header button:first-child {
-    all: unset;
     width: 90%;
-    cursor: pointer;
   }
 
   .header button:nth-child(2) {

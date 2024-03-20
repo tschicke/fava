@@ -16,17 +16,6 @@
   <HeaderIcon />
   <h1>
     {$ledger_title}{#if has_dropdown}&nbsp;▾{/if}<PageTitle />
-    <button
-      type="button"
-      hidden={!$has_changes}
-      class="reload-page"
-      use:keyboardShortcut={"r"}
-      on:click={() => {
-        router.reload();
-      }}
-    >
-      &#8635;
-    </button>
     {#if has_dropdown}
       <div class="beancount-files">
         <ul>
@@ -39,28 +28,31 @@
       </div>
     {/if}
   </h1>
+  <button
+    type="button"
+    hidden={!$has_changes}
+    class="reload-page"
+    use:keyboardShortcut={"r"}
+    on:click={router.reload.bind(router)}
+  >
+    &#8635;
+  </button>
+  <span class="spacer" />
   <FilterForm />
 </header>
 
 <style>
   .reload-page {
-    padding-right: 12px;
-    padding-left: 12px;
-    margin-top: -8px;
-    margin-left: 20px;
     background-color: var(--warning);
   }
 
   h1 {
-    display: block;
-    flex: 1;
-    max-height: var(--header-height);
-    padding: calc((var(--header-height) - 24px) / 2) 10px;
+    display: inline-block;
+    padding: 0.5rem;
     margin: 0;
     overflow: hidden;
     font-size: 16px;
     font-weight: normal;
-    color: var(--header-color);
   }
 
   a:hover,
@@ -71,17 +63,14 @@
 
   .beancount-files {
     position: absolute;
-    top: var(--header-height);
-    left: 19px;
     z-index: var(--z-index-floating-ui);
     display: none;
     width: 20em;
+    margin-top: 0.25em;
     color: var(--link-color);
     background-color: var(--background);
     border: 1px solid var(--border);
-    border-bottom-right-radius: 3px;
-    border-bottom-left-radius: 3px;
-    box-shadow: 0 3px 6px var(--transparent-black);
+    box-shadow: var(--box-shadow-dropdown);
   }
 
   .beancount-files a {
@@ -103,5 +92,11 @@
   .beancount-files a:hover {
     color: var(--background);
     background-color: var(--link-color);
+  }
+
+  @media print {
+    header > :global(:not(h1)) {
+      display: none;
+    }
   }
 </style>

@@ -1,4 +1,5 @@
 """Formatting numbers."""
+
 from __future__ import annotations
 
 import copy
@@ -58,7 +59,7 @@ class DecimalFormatModule(FavaModule):
         self._default_pattern = get_locale_format(None, 2)
         self.precisions: dict[str, int] = {}
 
-    def load_file(self) -> None:
+    def load_file(self) -> None:  # noqa: D102
         locale = None
 
         locale_option = self.ledger.fava_options.locale

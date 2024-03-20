@@ -4,28 +4,31 @@ This is used to pre-process some data that is used in the templates, allowing
 this part of the functionality to be tested and allowing some end-to-end tests
 for the frontend data validation.
 """
+
 from __future__ import annotations
 
-from copy import copy
 from dataclasses import dataclass
-from typing import Any
 from typing import TYPE_CHECKING
 
 from flask import current_app
 from flask import url_for
-from flask_babel import gettext  # type: ignore[import]
+from flask_babel import gettext  # type: ignore[import-untyped]
 
-from fava.beans.account import root
 from fava.context import g
 from fava.util.excel import HAVE_EXCEL
 
 if TYPE_CHECKING:  # pragma: no cover
     from datetime import date
+    from typing import Literal
 
     from fava.beans.abc import Meta
+    from fava.beans.abc import Query
     from fava.core.accounts import AccountDict
+    from fava.core.charts import DateAndBalance
+    from fava.core.charts import DateAndBalanceWithBudget
     from fava.core.extensions import ExtensionDetails
     from fava.core.fava_options import FavaOptions
+    from fava.core.tree import SerialisedTreeNode
     from fava.helpers import BeancountError
     from fava.util.date import Interval
 
@@ -41,7 +44,7 @@ class SerialisedError:
     @staticmethod
     def from_beancount_error(err: BeancountError) -> SerialisedError:
         """Get a serialisable error from a Beancount error."""
-        source = copy(err.source)
+        source = dict(err.source) if err.source is not None else None
         if source is not None:
             source.pop("__tolerances__", None)
         return SerialisedError(err.__class__.__name__, source, err.message)
@@ -55,6 +58,7 @@ class LedgerData:
     account_details: AccountDict
     base_url: str
     currencies: list[str]
+    currency_names: dict[str, str]
     errors: list[SerialisedError]
     fava_options: FavaOptions
     incognito: bool
@@ -65,7 +69,7 @@ class LedgerData:
     precisions: dict[str, int]
     tags: list[str]
     years: list[str]
-    user_queries: list[Any]
+    user_queries: list[Query]
     upcoming_events_count: int
     extensions: list[ExtensionDetails]
     sidebar_links: list[tuple[str, str]]
@@ -73,8 +77,24 @@ class LedgerData:
 
 
 def get_errors() -> list[SerialisedError]:
-    """Serialise errors (do not pass the entry as that might fail serialisation."""
+    """Serialise errors (do not pass entry as that might fail serialisation."""
     return [SerialisedError.from_beancount_error(e) for e in g.ledger.errors]
+
+
+def _get_options() -> dict[str, str | list[str]]:
+    options = g.ledger.options
+    return {
+        "documents": options["documents"],
+        "filename": options["filename"],
+        "include": options["include"],
+        "operating_currency": options["operating_currency"],
+        "title": options["title"],
+        "name_assets": options["name_assets"],
+        "name_liabilities": options["name_liabilities"],
+        "name_equity": options["name_equity"],
+        "name_income": options["name_income"],
+        "name_expenses": options["name_expenses"],
+    }
 
 
 def get_ledger_data() -> LedgerData:
@@ -86,18 +106,13 @@ def get_ledger_data() -> LedgerData:
         ledger.accounts,
         url_for("index"),
         ledger.attributes.currencies,
+        ledger.commodities.names,
         get_errors(),
         ledger.fava_options,
         current_app.config["INCOGNITO"],
         HAVE_EXCEL,
         ledger.attributes.links,
-        {
-            "documents": ledger.options["documents"],
-            "filename": ledger.options["filename"],
-            "include": ledger.options["include"],
-            "operating_currency": ledger.options["operating_currency"],
-            "title": ledger.options["title"],
-        },
+        _get_options(),
         ledger.attributes.payees,
         ledger.format_decimal.precisions,
         ledger.attributes.tags,
@@ -115,84 +130,94 @@ def get_ledger_data() -> LedgerData:
 
 
 @dataclass(frozen=True)
-class ChartData:
-    """The common data format to pass charts to the frontend."""
+class BalancesChart:
+    """Data for a balances chart."""
 
-    type: str
     label: str
-    data: Any
+    data: list[DateAndBalance]
+    type: Literal["balances"] = "balances"
 
 
-def _chart_interval_totals(
-    interval: Interval,
-    account_name: str,
-    label: str | None = None,
-    invert: bool = False,
-) -> ChartData:
-    return ChartData(
-        "bar",
-        label or account_name,
-        g.ledger.charts.interval_totals(
-            g.filtered,
-            interval,
-            account_name,
-            g.conversion,
-            invert,
-        ),
-    )
+@dataclass(frozen=True)
+class BarChart:
+    """Data for a bar chart."""
+
+    label: str
+    data: list[DateAndBalanceWithBudget]
+    type: Literal["bar"] = "bar"
 
 
-def _chart_hierarchy(
-    account_name: str,
-    begin_date: date | None = None,
-    end_date: date | None = None,
-    label: str | None = None,
-) -> ChartData:
-    modifier = (
-        +1
-        if root(account_name)
-        in (
-            g.ledger.options["name_assets"],
-            g.ledger.options["name_expenses"],
-        )
-        else -1
-    )
-    return ChartData(
-        "hierarchy",
-        label or account_name,
-        {
-            "modifier": modifier,
-            "root": g.ledger.charts.hierarchy(
-                g.filtered,
-                account_name,
-                g.conversion,
-                begin_date,
-                end_date or g.filtered.end_date,
-            ),
-        },
-    )
+@dataclass(frozen=True)
+class HierarchyChart:
+    """Data for a hierarchy chart."""
+
+    label: str
+    data: SerialisedTreeNode
+    type: Literal["hierarchy"] = "hierarchy"
 
 
-def _chart_net_worth() -> ChartData:
-    return ChartData(
-        "balances",
-        gettext("Net Worth"),
-        g.ledger.charts.net_worth(g.filtered, g.interval, g.conversion),
-    )
-
-
-def _chart_account_balance(account_name: str) -> ChartData:
-    return ChartData(
-        "balances",
-        gettext("Account Balance"),
-        g.ledger.charts.linechart(g.filtered, account_name, g.conversion),
-    )
+if TYPE_CHECKING:  # pragma: no cover
+    ChartData = BalancesChart | BarChart | HierarchyChart
 
 
 class ChartApi:
     """Functions to generate chart data."""
 
-    account_balance = _chart_account_balance
-    hierarchy = _chart_hierarchy
-    interval_totals = _chart_interval_totals
-    net_worth = _chart_net_worth
+    @staticmethod
+    def account_balance(account_name: str) -> ChartData:
+        """Generate data for an account balances chart."""
+        return BalancesChart(
+            gettext("Account Balance"),
+            g.ledger.charts.linechart(
+                g.filtered,
+                account_name,
+                g.conv,
+            ),
+        )
+
+    @staticmethod
+    def hierarchy(
+        account_name: str,
+        begin_date: date | None = None,
+        end_date: date | None = None,
+        label: str | None = None,
+    ) -> ChartData:
+        """Generate data for an account hierarchy chart."""
+        return HierarchyChart(
+            label or account_name,
+            g.ledger.charts.hierarchy(
+                g.filtered,
+                account_name,
+                g.conv,
+                begin_date,
+                end_date or g.filtered.end_date,
+            ),
+        )
+
+    @staticmethod
+    def interval_totals(
+        interval: Interval,
+        account_name: str | tuple[str, ...],
+        label: str | None = None,
+        *,
+        invert: bool = False,
+    ) -> ChartData:
+        """Generate data for an account per interval chart."""
+        return BarChart(
+            label or str(account_name),
+            g.ledger.charts.interval_totals(
+                g.filtered,
+                interval,
+                account_name,
+                g.conv,
+                invert=invert,
+            ),
+        )
+
+    @staticmethod
+    def net_worth() -> ChartData:
+        """Generate data for net worth chart."""
+        return BalancesChart(
+            gettext("Net Worth"),
+            g.ledger.charts.net_worth(g.filtered, g.interval, g.conv),
+        )

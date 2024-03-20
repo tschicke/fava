@@ -23,7 +23,7 @@
     return matchLength !== undefined
       ? `${input.value.slice(
           0,
-          selectionStart - matchLength
+          selectionStart - matchLength,
         )}${value}${input.value.slice(selectionStart)}`
       : value;
   }
@@ -99,7 +99,7 @@
   form {
     display: flex;
     flex-wrap: wrap;
-    padding-top: 7px;
+    gap: 0.5em;
     margin: 0;
     color: var(--text-color);
 
@@ -109,7 +109,6 @@
 
   form > :global(span) {
     max-width: 18rem;
-    margin: 0 4px 6px 0;
   }
 
   form :global(input) {

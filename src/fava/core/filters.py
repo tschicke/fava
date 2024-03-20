@@ -1,4 +1,5 @@
 """Entry filters."""
+
 from __future__ import annotations
 
 import re
@@ -9,9 +10,9 @@ from typing import Callable
 from typing import Iterable
 from typing import TYPE_CHECKING
 
-import ply.yacc  # type: ignore[import]
+import ply.yacc  # type: ignore[import-untyped]
 from beancount.core import account
-from beancount.ops.summarize import clamp_opt  # type: ignore[import]
+from beancount.ops.summarize import clamp_opt  # type: ignore[import-untyped]
 
 from fava.beans.account import get_entry_accounts
 from fava.helpers import FavaAPIError
@@ -42,7 +43,7 @@ class Token:
     error.
     """
 
-    __slots__ = ("type", "value", "lexer")
+    __slots__ = ("lexer", "type", "value")
 
     def __init__(self, type_: str, value: str) -> None:
         self.type = type_
@@ -86,7 +87,7 @@ class FilterSyntaxLexer:
         return token, token
 
     def STRING(self, token: str, value: str) -> tuple[str, str]:  # noqa: N802
-        if value[0] in ['"', "'"]:
+        if value[0] in {'"', "'"}:
             return token, value[1:-1]
         return token, value
 
@@ -218,7 +219,7 @@ class FilterSyntaxParser:
         left, right = p[1], p[3]
 
         def _or(entry: Directive) -> bool:
-            return left(entry) or right(entry)  #  type: ignore[no-any-return]
+            return left(entry) or right(entry)  # type: ignore[no-any-return]
 
         p[0] = _or
 
@@ -301,7 +302,7 @@ class EntryFilter(ABC):
 class TimeFilter(EntryFilter):
     """Filter by dates."""
 
-    __slots__ = ("date_range", "_options")
+    __slots__ = ("_options", "date_range")
 
     def __init__(
         self,
@@ -361,7 +362,7 @@ class AccountFilter(EntryFilter):
     The filter string can either be a regular expression or a parent account.
     """
 
-    __slots__ = ("_value", "_match")
+    __slots__ = ("_match", "_value")
 
     def __init__(self, value: str) -> None:
         self._value = value

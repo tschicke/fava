@@ -6,8 +6,8 @@
   import { _ } from "../i18n";
   import { notify_err } from "../notifications";
   import router from "../router";
-  import { closeOverlay } from "../stores";
   import { reloadAfterSavingEntrySlice } from "../stores/editor";
+  import { closeOverlay } from "../stores/url";
 
   import DeleteButton from "./DeleteButton.svelte";
   import SaveButton from "./SaveButton.svelte";
@@ -78,7 +78,7 @@
         },
       },
     ],
-    beancount_language_support
+    beancount_language_support,
   );
 </script>
 
